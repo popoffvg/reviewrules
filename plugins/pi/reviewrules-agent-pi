@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# reviewrules-agent-pi: a reviewrules exec agent plugin on the pi coding agent CLI. It needs pi and jq.
+# Sessions go to $PI_SESSION_DIR, else to a folder under $TMPDIR for each prompt_cache_key.
+# pi has no step limit flag, so max_steps has no effect.
+set -euo pipefail
+
+request="$(cat)"
+field() { jq -r --arg key "$1" '.[$key] // empty' <<<"$request"; }
+
+if [[ "$(field protocol_version)" != "1" ]]; then
+	echo "reviewrules-agent-pi: protocol_version $(field protocol_version) is not supported" >&2
+	exit 2
+fi
+
+new_session_id() { uuidgen | tr '[:upper:]' '[:lower:]'; }
+
+case "${1:-}" in
+start-parent) session_args=(--session-id "$(new_session_id)") ;;
+fork | append)
+	session_id="$(field session_id)"
+	[[ -n "$session_id" ]] || { echo "reviewrules-agent-pi: $1 request has no session_id" >&2; exit 2; }
+	if [[ "$1" == fork ]]; then
+		session_args=(--fork "$session_id" --session-id "$(new_session_id)")
+	else
+		session_args=(--session "$session_id")
+	fi
+	;;
+*)
+	echo "reviewrules-agent-pi: operation ${1:-} is unknown" >&2
+	exit 2
+	;;
+esac
+
+cache_key="$(field prompt_cache_key | tr -c 'A-Za-z0-9._-' '_')"
+session_dir="${PI_SESSION_DIR:-${TMPDIR:-/tmp}/reviewrules-pi/${cache_key:-default}}"
+mkdir -p "$session_dir"
+
+# Only read and search tools: the model MUST NOT change the repo. --no-approve ignores the
+# project-local pi files of the repo under review.
+read_only_tools="read,grep,find,ls"
+args=(-p --mode json
+	--tools "$read_only_tools"
+	--no-approve --no-context-files --no-skills --no-prompt-templates
+	--session-dir "$session_dir"
+	--system-prompt "$(field system_prompt)"
+	"${session_args[@]}")
+model="$(field model)"
+[[ -n "$model" ]] && args+=(--model "$model")
+effort="$(field reasoning_effort)"
+[[ -n "$effort" ]] && args+=(--thinking "$effort")
+
+repo_root="$(field repo_root)"
+[[ -n "$repo_root" ]] && cd "$repo_root"
+
+pi_exit=0
+events="$(pi "${args[@]}" -- "$(field prompt)")" || pi_exit=$?
+if [[ "$pi_exit" != "0" ]]; then
+	echo "reviewrules-agent-pi: pi exited with $pi_exit" >&2
+	exit 1
+fi
+
+# The session header names the session pi wrote to. Usage is the sum over every assistant
+# message of the run, because each tool turn is one more model call.
+jq -s '
+	(map(select(.type == "session")) | last | .id) as $session_id
+	| [.[] | select(.type == "message_end" and .message.role == "assistant") | .message] as $replies
+	| ($replies | last) as $last
+	| if $session_id == null then error("pi gave no session header")
+	elif $last == null then error("pi gave no assistant message")
+	elif ($last.stopReason == "error" or $last.stopReason == "aborted")
+	then error("pi stopped with " + $last.stopReason + ": " + ($last.errorMessage // "no message"))
+	else {
+		session_id: $session_id,
+		text: ([$last.content[] | select(.type == "text") | .text] | join("")),
+		usage: {
+			input_tokens: ([$replies[].usage.input // 0] | add),
+			cached_input_tokens: ([$replies[].usage.cacheRead // 0] | add),
+			output_tokens: ([$replies[].usage.output // 0] | add),
+			cache_write_tokens: ([$replies[].usage.cacheWrite // 0] | add),
+			reasoning_tokens: ([$replies[].usage.reasoning // 0] | add)
+		}
+	} end
+' <<<"$events" || { echo "reviewrules-agent-pi: pi output has no usable reply" >&2; exit 1; }

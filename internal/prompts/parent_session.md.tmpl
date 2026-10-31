@@ -1,0 +1,33 @@
+# Repository review instructions
+
+{{.Instructions}}
+{{- range .RuleSetInstructions}}
+
+# Rule set {{.Name}} review instructions
+
+{{.Text}}
+{{- end}}
+
+# Convention docs the review rules refer to
+{{range .Docs}}
+## {{.Path}} — {{.Description}}
+
+{{.Content}}
+{{end}}
+# The diff under review (base {{.Base}})
+
+Changed files:
+{{range .ChangedFiles}}- {{.}}
+{{end}}
+```diff
+{{.Patch}}
+```
+
+# Your task now: map the change
+
+Later turns will ask you to check single rules and single hypotheses against this diff.
+Prepare for them. Do NOT judge anything yet.
+1. For each changed function or type, say in one line what the change does.
+2. Use grep to find the callers of each changed signature. List them as file:line.
+3. Name the shared state, error paths, and boundaries the change touches.
+Keep the map under 500 words. No verdicts.

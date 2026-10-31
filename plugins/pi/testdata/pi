@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Stub pi CLI: writes its args, one per line, to $PI_STUB_ARGS_FILE and prints a canned JSON event stream.
+# The session id is the value of --session-id, else of --session. PI_STUB_STOP_REASON sets the last stopReason.
+set -euo pipefail
+printf '%s\n' "$@" >"$PI_STUB_ARGS_FILE"
+session_id=""
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+	--session-id) session_id="$2"; shift ;;
+	--session) [[ -n "$session_id" ]] || session_id="$2"; shift ;;
+	esac
+	shift
+done
+stop_reason="${PI_STUB_STOP_REASON:-stop}"
+cat <<EOF
+{"type":"session","version":3,"id":"$session_id","timestamp":"2026-01-01T00:00:00.000Z","cwd":"$PWD"}
+{"type":"agent_start"}
+{"type":"message_end","message":{"role":"user","content":"prompt","timestamp":1}}
+{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"reading"},{"type":"toolCall","id":"c1","name":"read","arguments":{}}],"usage":{"input":10,"output":2,"cacheRead":100,"cacheWrite":5,"totalTokens":117},"stopReason":"toolUse"}}
+{"type":"message_end","message":{"role":"assistant","content":[{"type":"thinking","thinking":"hidden"},{"type":"text","text":"stub "},{"type":"text","text":"reply"}],"usage":{"input":20,"output":3,"cacheRead":200,"cacheWrite":0,"reasoning":1,"totalTokens":223},"stopReason":"$stop_reason","errorMessage":"stub failure"}}
+{"type":"agent_end","messages":[],"willRetry":false}
+EOF

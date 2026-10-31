@@ -1,0 +1,36 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - errorlint
+    - gocritic
+    - gosec
+    - misspell
+    - nilerr
+    - noctx
+    - revive
+    - unconvert
+    - unparam
+  settings:
+    gocritic:
+      enabled-checks:
+        - ruleguard
+      settings:
+        ruleguard:
+          rules: "${base-path}/.ruleguard/reviewrules_rules.go"
+          failOn: all
+    gosec:
+      excludes:
+        # The tool runs git, codex, and claude with arguments it builds itself; the binaries
+        # come from the settings file or PATH on purpose.
+        - G204
+    revive:
+      rules:
+        - name: exported
+          arguments: [disableStutteringCheck]
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

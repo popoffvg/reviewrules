@@ -1,0 +1,22 @@
+# New task: answer ONE hypothesis
+
+Id: {{.ID}}
+At: {{.At}}
+Question: {{.Question}}
+Look: {{.Look}}
+
+Yes means the code has the defect. A different defect you see is not yours; leave it out.
+1. Read the code at At.
+2. Search for YES and for NO with the same effort. Follow only what the question needs.
+3. Every "nothing found" needs a positive control: the same search against a symbol that exists, and its hit. No control means UNSURE.
+4. Never claim a build or test result; you cannot run anything.
+
+Verdicts:
+- CONFIRMED: you quote the line with the defect and name the input and the wrong result.
+- REFUTED: you quote the line, or the controlled search, that shows the defect is not there.
+- UNSURE: the evidence does not decide it; name what is missing.
+
+End with this JSON block. scenario and edit are for CONFIRMED only:
+```json
+{"verdict": "CONFIRMED or REFUTED or UNSURE", "evidence": ["file:line — code as written — what it shows"], "scenario": "input -> wrong result", "edit": "file:line — the change that fixes it"}
+```

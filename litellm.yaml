@@ -1,0 +1,20 @@
+# Local LiteLLM proxy for reviewrules. Start it with scripts/litellm-local.sh, which sets the master key
+# and binds to 127.0.0.1 only. The models run on a ChatGPT subscription (Codex allowance) and need a
+# one-time device login into ~/.config/litellm/chatgpt/auth.json before the proxy starts; see README.
+model_list:
+  - model_name: gpt-6-luna
+    model_info:
+      mode: responses
+    litellm_params:
+      model: chatgpt/gpt-6-luna
+  - model_name: gpt-6.1-sol
+    model_info:
+      mode: responses
+    litellm_params:
+      model: chatgpt/gpt-6.1-sol
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+
+litellm_settings:
+  drop_params: true

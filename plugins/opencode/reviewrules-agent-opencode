@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# reviewrules-agent-opencode: a reviewrules exec agent plugin on the opencode CLI. It needs opencode and jq.
+# Each run starts a private opencode server (--standalone). Sessions go to the opencode database.
+set -euo pipefail
+
+request="$(cat)"
+field() { jq -r --arg key "$1" '.[$key] // empty' <<<"$request"; }
+fail() {
+	echo "reviewrules-agent-opencode: $1" >&2
+	exit "${2:-1}"
+}
+
+[[ "$(field protocol_version)" == "1" ]] || fail "protocol_version $(field protocol_version) is not supported" 2
+
+# opencode rejects a session id that does not start with "ses".
+new_session_id() { echo "ses_$(uuidgen | tr -d '-' | tr '[:upper:]' '[:lower:]')"; }
+
+case "${1:-}" in
+start-parent) session_args=(--session "$(new_session_id)") ;;
+fork | append)
+	session_id="$(field session_id)"
+	[[ -n "$session_id" ]] || fail "$1 request has no session_id" 2
+	session_args=(--session "$session_id")
+	[[ "$1" == append ]] || session_args+=(--fork)
+	;;
+*) fail "operation ${1:-} is unknown" 2 ;;
+esac
+
+# opencode replaces {env:NAME} and {file:path} in the config text. A {file:} reference keeps the
+# system prompt out of that text, so the prompt reaches the model unchanged.
+system_prompt_file="$(mktemp "${TMPDIR:-/tmp}/reviewrules-opencode.XXXXXX")"
+trap 'rm -f "$system_prompt_file"' EXIT
+jq -j '.system_prompt // ""' <<<"$request" >"$system_prompt_file"
+
+model="$(field model)"
+effort="$(field reasoning_effort)"
+agent_name="reviewrules"
+run_args=(run --standalone --format json --agent "$agent_name" "${session_args[@]}")
+agent_variant=""
+if [[ -n "$model" ]]; then
+	run_args+=(--model "$model${effort:+#$effort}")
+else
+	agent_variant="$effort"
+fi
+
+# The agent denies every tool except read, grep, and glob: the model MUST NOT change the repo.
+agent_config="$(jq -n \
+	--arg name "$agent_name" \
+	--arg prompt "{file:$system_prompt_file}" \
+	--arg variant "$agent_variant" \
+	--argjson steps "$(field max_steps | grep -E '^[0-9]+$' || echo 0)" \
+	'{agent: {($name): ({
+		description: "reviewrules read-only reviewer",
+		mode: "primary",
+		prompt: $prompt,
+		permission: {"*": "deny", read: "allow", grep: "allow", glob: "allow"}
+	}
+	+ (if $steps > 0 then {steps: $steps} else {} end)
+	+ (if $variant != "" then {variant: $variant} else {} end))}}')"
+
+repo_root="$(field repo_root)"
+[[ -n "$repo_root" ]] && cd "$repo_root"
+
+# OPENCODE_DISABLE_PROJECT_CONFIG keeps the opencode config of the repo under review out of the run.
+export OPENCODE_CONFIG_CONTENT="$agent_config" OPENCODE_DISABLE_PROJECT_CONFIG=1
+
+run_exit=0
+events="$(opencode "${run_args[@]}" -- "$(field prompt)")" || run_exit=$?
+
+run_error="$(jq -r 'select(.type == "error") | .error.message // "unknown error"' <<<"$events" 2>/dev/null || true)"
+[[ -z "$run_error" ]] || fail "opencode run failed: $run_error"
+[[ "$run_exit" == "0" ]] || fail "opencode run exited with $run_exit"
+
+session_id="$(jq -r 'select(.sessionID != null and .sessionID != "") | .sessionID' <<<"$events" | head -n 1)"
+[[ -n "$session_id" ]] || fail "opencode run gave no session id"
+
+# The run events can end before the last step_finish, so the usage comes from the saved session.
+session="$(opencode session export --standalone "$session_id")" || fail "opencode session export $session_id failed"
+
+# This run wrote every message after the last user message. Usage is the sum over its assistant
+# messages, because each tool step is one more model call.
+jq --arg session_id "$session_id" '
+	([.messages | to_entries[] | select(.value.type == "user") | .key] | last) as $prompt_index
+	| [.messages[($prompt_index // -1) + 1:][] | select(.type == "assistant")] as $replies
+	| if ($replies | length) == 0 then error("no assistant message after the prompt")
+	else {
+		session_id: $session_id,
+		text: ([$replies | last | .content[]? | select(.type == "text") | .text] | join("")),
+		usage: {
+			input_tokens: ([$replies[].tokens.input // 0] | add),
+			cached_input_tokens: ([$replies[].tokens.cache.read // 0] | add),
+			output_tokens: ([$replies[].tokens.output // 0] | add),
+			cache_write_tokens: ([$replies[].tokens.cache.write // 0] | add),
+			reasoning_tokens: ([$replies[].tokens.reasoning // 0] | add)
+		}
+	} end
+' <<<"$session" || fail "opencode session $session_id has no usable reply"

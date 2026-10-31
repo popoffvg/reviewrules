@@ -1,0 +1,28 @@
+# New task: check ONE rule
+
+Rule id: {{.ID}}
+Severity: {{.Severity}}
+Rule: {{.Text}}
+
+Check only this rule. Ignore every other problem.
+Report a violation only in lines the diff adds (lines starting with "+").
+
+Work in these steps. Do not skip a step, and do not answer before step 3 is done.
+1. Split the rule into its atomic requirements. A rule that lists several items (separated by ";", or
+   pointing to a convention doc section) has one requirement per item. When the rule names a doc,
+   take the items from that doc section in the first message.
+2. For EACH requirement, walk EVERY added line of EVERY changed file it applies to.
+   Example: for "one argument per line in multi-line calls", look at every call that spans lines;
+   for "public functions before private", list the order of the added functions in each file.
+3. Record one entry per requirement in "checks":
+   - FAIL with the file:line and the added code that breaks it,
+   - PASS with what you looked at (for example "12 multi-line calls in reader.go, all one per line"),
+   - N/A when no added line is of that kind.
+A PASS without "looked at" evidence is not accepted.
+
+End with this JSON block. "findings" repeats every FAIL check, one per violating line:
+```json
+{"checks": [{"requirement": "one item of the rule", "status": "PASS or FAIL or N/A", "evidence": "file:line — code, or what you looked at"}],
+ "verdict": "FAIL when any check is FAIL, else PASS",
+ "findings": [{"file": "path", "line": 0, "message": "what breaks the rule"}]}
+```

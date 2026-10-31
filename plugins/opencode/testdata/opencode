@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Stub opencode CLI for `run` and `session export`.
+# `run` writes its args, one per line, to $OPENCODE_STUB_ARGS_FILE, the config to $OPENCODE_STUB_CONFIG_FILE,
+# and the system prompt file to $OPENCODE_STUB_SYSTEM_PROMPT_FILE. Its session id is "ses_fork-1" with
+# --fork, else the --session value. OPENCODE_STUB_ERROR makes `run` print an error event and exit 1.
+set -euo pipefail
+
+if [[ "$1" == "session" && "$2" == "export" ]]; then
+	session_id="${*: -1}"
+	cat <<EOF
+{"info":{"id":"$session_id"},"messages":[
+{"id":"m1","type":"user","text":"parent prompt","files":[]},
+{"id":"m2","type":"assistant","content":[{"type":"text","text":"parent reply"}],"tokens":{"input":1000,"output":1000,"reasoning":0,"cache":{"read":0,"write":0}}},
+{"id":"m3","type":"idle","outcome":"succeeded"},
+{"id":"m4","type":"user","text":"prompt","files":[]},
+{"id":"m5","type":"assistant","content":[{"type":"text","text":"reading"}],"tokens":{"input":10,"output":2,"reasoning":0,"cache":{"read":100,"write":5}}},
+{"id":"m6","type":"assistant","content":[{"type":"reasoning","text":"hidden"},{"type":"text","text":"stub "},{"type":"text","text":"reply"}],"tokens":{"input":20,"output":3,"reasoning":1,"cache":{"read":200,"write":0}}},
+{"id":"m7","type":"idle","outcome":"succeeded"}
+]}
+EOF
+	exit 0
+fi
+
+printf '%s\n' "$@" >"$OPENCODE_STUB_ARGS_FILE"
+printf '%s' "$OPENCODE_CONFIG_CONTENT" >"$OPENCODE_STUB_CONFIG_FILE"
+prompt_ref="$(jq -r '.agent.reviewrules.prompt' <<<"$OPENCODE_CONFIG_CONTENT")"
+prompt_path="${prompt_ref#\{file:}"
+cp "${prompt_path%\}}" "$OPENCODE_STUB_SYSTEM_PROMPT_FILE"
+
+session_id=""
+fork=""
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+	--session) session_id="$2"; shift ;;
+	--fork) fork=1 ;;
+	esac
+	shift
+done
+[[ -z "$fork" ]] || session_id="ses_fork-1"
+
+if [[ -n "${OPENCODE_STUB_ERROR:-}" ]]; then
+	echo '{"type":"error","sessionID":"'"$session_id"'","error":{"type":"provider.auth","message":"stub failure"}}'
+	exit 1
+fi
+cat <<EOF
+{"type":"step_start","sessionID":"$session_id","part":{"type":"step-start"}}
+{"type":"text","sessionID":"$session_id","part":{"type":"text","text":"stub reply"}}
+EOF

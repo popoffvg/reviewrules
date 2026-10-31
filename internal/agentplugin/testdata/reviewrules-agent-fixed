@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Test plugin: checks the request of each operation and gives a fixed reply.
+set -euo pipefail
+request="$(cat)"
+[[ "$request" == *'"protocol_version":1'* ]] || { echo "protocol_version is not 1" >&2; exit 2; }
+case "${1:-}" in
+start-parent) session_id="parent-1" ;;
+fork)
+	[[ "$request" == *'"session_id":"parent-1"'* ]] || { echo "fork has no parent-1" >&2; exit 3; }
+	session_id="fork-1"
+	;;
+append)
+	[[ "$request" == *'"session_id":"fork-1"'* ]] || { echo "append has no fork-1" >&2; exit 3; }
+	session_id="fork-1"
+	;;
+*)
+	echo "operation ${1:-} is unknown" >&2
+	exit 2
+	;;
+esac
+printf '{"session_id":"%s","text":"%s done","usage":{"input_tokens":10,"cached_input_tokens":90,"output_tokens":5}}\n' "$session_id" "$1"

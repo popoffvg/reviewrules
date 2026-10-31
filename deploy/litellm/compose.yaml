@@ -1,0 +1,21 @@
+# Shared LiteLLM proxy for reviewrules in CI, on a host next to the runners.
+# It holds the one ChatGPT login and refreshes it; CI jobs only send LITELLM_API_KEY.
+#
+# The ChatGPT refresh token works once, so ./tokens MUST stay on this host's disk and writable,
+# and only one proxy process may use it. Never copy auth.json into a CI secret.
+services:
+  litellm:
+    # Check the tag exists before the first deploy; LiteLLM publishes main-v<version> images.
+    image: ghcr.io/berriai/litellm:main-v1.106.6
+    restart: unless-stopped
+    command: ["--config", "/app/litellm.yaml", "--port", "4000"]
+    ports:
+      # Reachable from the runners' network only; put TLS in front if it leaves that network.
+      - "${REVIEWRULES_PROXY_BIND:-10.0.0.10}:4000:4000"
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in .env}
+      CHATGPT_TOKEN_DIR: /tokens
+      CHATGPT_DEFAULT_INSTRUCTIONS: "Follow the system and developer messages in the input."
+    volumes:
+      - ../../litellm.yaml:/app/litellm.yaml:ro
+      - ./tokens:/tokens
