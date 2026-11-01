@@ -1,0 +1,53 @@
+{
+  "instructions": "An offers package for a multi-tenant shop. Callers provide nonnegative prices and quantities, discount percentages from 0 through 100, and nonnegative page sizes and offsets. Cache instances are used by one goroutine. PageOffers must return every available item in the requested page, including a page ending exactly at the slice length. DiscountedCents applies the stated percentage discount to a cent total. TopOffers returns up to limit cheapest offers.",
+  "rules": [
+    {
+      "id": "money-rounding",
+      "rule": "Round monetary order totals to the nearest cent only after multiplying the unit price by the quantity. Do not round each unit first.",
+      "scope": [
+        "**/*.go"
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "caller-context",
+      "rule": "Pass the caller context to every outbound quote lookup so cancellation and context values propagate.",
+      "scope": [
+        "**/*.go"
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "tenant-cache",
+      "rule": "A cached quote must be keyed by both tenant ID and SKU. One tenant must never read another tenant's cached quote.",
+      "scope": [
+        "**/*.go"
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "offer-ties",
+      "rule": "Rank offers by ascending price. Preserve the original input order when prices tie.",
+      "scope": [
+        "**/*.go"
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "input-ownership",
+      "rule": "Functions receiving an offer slice must not mutate the caller's slice or its elements.",
+      "scope": [
+        "**/*.go"
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "lookup-errors",
+      "rule": "An outbound quote lookup error must be wrapped with its original cause and include the operation and SKU.",
+      "scope": [
+        "**/*.go"
+      ],
+      "severity": "medium"
+    }
+  ]
+}

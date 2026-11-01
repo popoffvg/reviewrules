@@ -1,0 +1,36 @@
+{"Time":"2026-11-01T19:20:06.373603+01:00","Action":"start","Package":"comparison.example/offers"}
+{"Time":"2026-11-01T19:20:06.378905+01:00","Action":"run","Package":"comparison.example/offers","Test":"TestMoneyRounding"}
+{"Time":"2026-11-01T19:20:06.378943+01:00","Action":"output","Package":"comparison.example/offers","Test":"TestMoneyRounding","Output":"=== RUN   TestMoneyRounding\n","OutputType":"frame"}
+{"Time":"2026-11-01T19:20:06.378983+01:00","Action":"output","Package":"comparison.example/offers","Test":"TestMoneyRounding","Output":"--- PASS: TestMoneyRounding (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-11-01T19:20:06.37899+01:00","Action":"pass","Package":"comparison.example/offers","Test":"TestMoneyRounding","Elapsed":0}
+{"Time":"2026-11-01T19:20:06.378994+01:00","Action":"run","Package":"comparison.example/offers","Test":"TestCallerContext"}
+{"Time":"2026-11-01T19:20:06.378995+01:00","Action":"output","Package":"comparison.example/offers","Test":"TestCallerContext","Output":"=== RUN   TestCallerContext\n","OutputType":"frame"}
+{"Time":"2026-11-01T19:20:06.378997+01:00","Action":"output","Package":"comparison.example/offers","Test":"TestCallerContext","Output":"--- PASS: TestCallerContext (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-11-01T19:20:06.379003+01:00","Action":"pass","Package":"comparison.example/offers","Test":"TestCallerContext","Elapsed":0}
+{"Time":"2026-11-01T19:20:06.379004+01:00","Action":"run","Package":"comparison.example/offers","Test":"TestTenantCache"}
+{"Time":"2026-11-01T19:20:06.379005+01:00","Action":"output","Package":"comparison.example/offers","Test":"TestTenantCache","Output":"=== RUN   TestTenantCache\n","OutputType":"frame"}
+{"Time":"2026-11-01T19:20:06.379007+01:00","Action":"output","Package":"comparison.example/offers","Test":"TestTenantCache","Output":"--- PASS: TestTenantCache (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-11-01T19:20:06.379012+01:00","Action":"pass","Package":"comparison.example/offers","Test":"TestTenantCache","Elapsed":0}
+{"Time":"2026-11-01T19:20:06.379013+01:00","Action":"run","Package":"comparison.example/offers","Test":"TestOfferTies"}
+{"Time":"2026-11-01T19:20:06.379014+01:00","Action":"output","Package":"comparison.example/offers","Test":"TestOfferTies","Output":"=== RUN   TestOfferTies\n","OutputType":"frame"}
+{"Time":"2026-11-01T19:20:06.379018+01:00","Action":"output","Package":"comparison.example/offers","Test":"TestOfferTies","Output":"--- PASS: TestOfferTies (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-11-01T19:20:06.379019+01:00","Action":"pass","Package":"comparison.example/offers","Test":"TestOfferTies","Elapsed":0}
+{"Time":"2026-11-01T19:20:06.37902+01:00","Action":"run","Package":"comparison.example/offers","Test":"TestPageBoundary"}
+{"Time":"2026-11-01T19:20:06.379022+01:00","Action":"output","Package":"comparison.example/offers","Test":"TestPageBoundary","Output":"=== RUN   TestPageBoundary\n","OutputType":"frame"}
+{"Time":"2026-11-01T19:20:06.379024+01:00","Action":"output","Package":"comparison.example/offers","Test":"TestPageBoundary","Output":"--- PASS: TestPageBoundary (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-11-01T19:20:06.379025+01:00","Action":"pass","Package":"comparison.example/offers","Test":"TestPageBoundary","Elapsed":0}
+{"Time":"2026-11-01T19:20:06.379026+01:00","Action":"run","Package":"comparison.example/offers","Test":"TestPercentageDiscount"}
+{"Time":"2026-11-01T19:20:06.379027+01:00","Action":"output","Package":"comparison.example/offers","Test":"TestPercentageDiscount","Output":"=== RUN   TestPercentageDiscount\n","OutputType":"frame"}
+{"Time":"2026-11-01T19:20:06.379034+01:00","Action":"output","Package":"comparison.example/offers","Test":"TestPercentageDiscount","Output":"--- PASS: TestPercentageDiscount (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-11-01T19:20:06.379038+01:00","Action":"pass","Package":"comparison.example/offers","Test":"TestPercentageDiscount","Elapsed":0}
+{"Time":"2026-11-01T19:20:06.379039+01:00","Action":"run","Package":"comparison.example/offers","Test":"TestInputOwnership"}
+{"Time":"2026-11-01T19:20:06.379041+01:00","Action":"output","Package":"comparison.example/offers","Test":"TestInputOwnership","Output":"=== RUN   TestInputOwnership\n","OutputType":"frame"}
+{"Time":"2026-11-01T19:20:06.379043+01:00","Action":"output","Package":"comparison.example/offers","Test":"TestInputOwnership","Output":"--- PASS: TestInputOwnership (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-11-01T19:20:06.379044+01:00","Action":"pass","Package":"comparison.example/offers","Test":"TestInputOwnership","Elapsed":0}
+{"Time":"2026-11-01T19:20:06.379045+01:00","Action":"run","Package":"comparison.example/offers","Test":"TestLookupErrors"}
+{"Time":"2026-11-01T19:20:06.379046+01:00","Action":"output","Package":"comparison.example/offers","Test":"TestLookupErrors","Output":"=== RUN   TestLookupErrors\n","OutputType":"frame"}
+{"Time":"2026-11-01T19:20:06.379063+01:00","Action":"output","Package":"comparison.example/offers","Test":"TestLookupErrors","Output":"--- PASS: TestLookupErrors (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-11-01T19:20:06.379066+01:00","Action":"pass","Package":"comparison.example/offers","Test":"TestLookupErrors","Elapsed":0}
+{"Time":"2026-11-01T19:20:06.379068+01:00","Action":"output","Package":"comparison.example/offers","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-11-01T19:20:06.37958+01:00","Action":"output","Package":"comparison.example/offers","Output":"ok  \tcomparison.example/offers\t0.006s\n"}
+{"Time":"2026-11-01T19:20:06.379605+01:00","Action":"pass","Package":"comparison.example/offers","Elapsed":0.006}

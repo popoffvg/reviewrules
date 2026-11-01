@@ -1,0 +1,21 @@
+package offers
+
+import (
+ "reflect"
+ "testing"
+)
+
+func TestPageOffsetOverflow(t *testing.T) {
+ defer func() {
+  recovered := recover()
+  if recovered != nil {
+   t.Errorf("valid page request panicked: %v", recovered)
+  }
+ }()
+ offers := List{{SKU: "a", Price: 100}, {SKU: "b", Price: 200}}
+ largestSize := PageSize(int(^uint(0) >> 1))
+ got := PageOffers(offers, 1, largestSize)
+ if !reflect.DeepEqual(got, offers[1:]) {
+  t.Fatalf("got %v, want remaining offer %v", got, offers[1:])
+ }
+}

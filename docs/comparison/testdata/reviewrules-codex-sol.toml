@@ -1,0 +1,8 @@
+[local]
+agent = "codex"
+model = "gpt-6.1-sol"
+hypothesis_model = "gpt-6.1-sol"
+hypothesis_check_model = "gpt-6.1-sol"
+reasoning_effort = "high"
+rule_reasoning_effort = "high"
+parallel = 4

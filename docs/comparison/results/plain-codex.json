@@ -1,0 +1,81 @@
+{
+  "rules": [
+    {
+      "id": "money-rounding",
+      "verdict": "FAIL",
+      "evidence": "Checked offers.go:36-38, the only order-total calculation. Multiplication before rounding: FAIL. Nearest-cent rounding of the completed total: FAIL. Other changed lines do not calculate order totals.",
+      "findings": [
+        {
+          "file": "offers.go",
+          "line": 37,
+          "message": "The unit price is rounded before multiplying by quantity. TotalCents(0.014, 3) returns 3 cents instead of rounding the complete total to 4 cents. Multiply by quantity before rounding."
+        }
+      ]
+    },
+    {
+      "id": "caller-context",
+      "verdict": "FAIL",
+      "evidence": "Checked the lookup declaration at offers.go:32-34 and the sole outbound invocation at offers.go:41. Caller cancellation propagation: FAIL. Caller context-value propagation: FAIL. No other changed line performs a lookup.",
+      "findings": [
+        {
+          "file": "offers.go",
+          "line": 41,
+          "message": "LookupQuote receives context.Background() instead of ctx, discarding caller cancellation and context values. Pass ctx directly."
+        }
+      ]
+    },
+    {
+      "id": "tenant-cache",
+      "verdict": "FAIL",
+      "evidence": "Checked cache storage and construction at offers.go:48-54, writes at offers.go:56-58, and reads at offers.go:60-63. SKU keying: PASS. Tenant keying: FAIL. Cross-tenant isolation: FAIL. Other changed lines do not access the cache.",
+      "findings": [
+        {
+          "file": "offers.go",
+          "line": 49,
+          "message": "The map and both accessors key quotes solely by SKU. After StoreQuote(\"tenant-a\", \"sku\", quoteA), LoadQuote(\"tenant-b\", \"sku\") returns quoteA. Include tenant ID and SKU in both write and read keys."
+        }
+      ]
+    },
+    {
+      "id": "offer-ties",
+      "verdict": "FAIL",
+      "evidence": "Checked all ranking and selection code at offers.go:65-79. Ascending price comparison at offers.go:71: PASS. Original order for equal prices at offers.go:67-69: FAIL. No other changed line ranks offers.",
+      "findings": [
+        {
+          "file": "offers.go",
+          "line": 69,
+          "message": "Equal-price offers are reordered by SKU. Input [{SKU:\"b\", Price:100}, {SKU:\"a\", Price:100}] with limit 1 returns \"a\" instead of the original first offer \"b\". Use a stable sort comparing only price."
+        }
+      ]
+    },
+    {
+      "id": "input-ownership",
+      "verdict": "PASS",
+      "evidence": "Checked both slice receivers throughout offers.go:65-90. TopOffers copies the slice at offers.go:66 before sorting and truncates only that copy. Offer elements contain value fields only (offers.go:25-28). PageOffers only reads and subslices its input (offers.go:83-90). Neither function mutates caller slice storage or elements; returning a shared subslice is not itself a mutation.",
+      "findings": []
+    },
+    {
+      "id": "lookup-errors",
+      "verdict": "PASS",
+      "evidence": "Checked the sole outbound lookup and its complete error path at offers.go:41-45. Original cause wrapping: PASS through %w. Operation identification: PASS through \"fetch quote\". SKU inclusion: PASS through %q and sku. No other changed line handles an outbound lookup error.",
+      "findings": []
+    }
+  ],
+  "correctness": [
+    {
+      "file": "offers.go",
+      "line": 87,
+      "message": "PageOffers discards available items whenever the requested end reaches or exceeds the slice length. For three offers, offset 1 and size 2 returns nil instead of the final two offers; size 3 also incorrectly returns nil. Clamp the end to len(offers) and return the available slice."
+    },
+    {
+      "file": "offers.go",
+      "line": 86,
+      "message": "Adding valid nonnegative offset and size can overflow int and cause a slice panic at offers.go:90. On a 64-bit platform, two offers with offset 1 and size 9223372036854775807 produce a negative end. Compare size against len(offers)-offset before adding, returning the remaining available items."
+    },
+    {
+      "file": "offers.go",
+      "line": 94,
+      "message": "Integer division computes the discount multiplier before applying it, making every percentage from 1 through 99 yield zero. DiscountedCents(1000, 10) returns 0 instead of 900. Apply the percentage to the total before division, preserving the fractional multiplier."
+    }
+  ]
+}

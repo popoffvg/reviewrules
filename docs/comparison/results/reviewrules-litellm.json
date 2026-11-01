@@ -1,0 +1,404 @@
+{
+  "base": "main",
+  "model": "gpt-6-luna",
+  "hypothesis_model": "gpt-6.1-sol",
+  "hypothesis_check_model": "gpt-6-luna",
+  "rule_dirs": [
+    ".reviewrules"
+  ],
+  "changed_files": [
+    "offers.go"
+  ],
+  "skipped_rule_ids": null,
+  "rules": [
+    {
+      "rule_id": "money-rounding",
+      "severity": "medium",
+      "verdict": "FAIL",
+      "findings": [
+        {
+          "file": "offers.go",
+          "line": 37,
+          "message": "Rounds the unit price to cents before multiplying by quantity; the rule requires multiplying first and rounding the total."
+        }
+      ],
+      "checks": [
+        {
+          "requirement": "Multiply the unit price by the quantity first, then round the resulting monetary total to the nearest cent; do not round each unit first.",
+          "status": "FAIL",
+          "evidence": "offers.go:37 — `return Cents(math.Round(float64(price)*100)) * Cents(quantity)` rounds the unit price to cents before multiplying by quantity."
+        }
+      ],
+      "usage": {
+        "input_tokens": 3483,
+        "output_tokens": 302,
+        "total_tokens": 3785,
+        "reasoning_tokens": 107,
+        "cache_creation_tokens": 0,
+        "cache_read_tokens": 0
+      }
+    },
+    {
+      "rule_id": "caller-context",
+      "severity": "medium",
+      "verdict": "FAIL",
+      "findings": [
+        {
+          "file": "offers.go",
+          "line": 41,
+          "message": "The quote lookup uses `context.Background()` rather than the caller’s context, so caller cancellation and context values do not propagate."
+        }
+      ],
+      "checks": [
+        {
+          "requirement": "Pass the caller context to every outbound quote lookup so cancellation and context values propagate.",
+          "status": "FAIL",
+          "evidence": "offers.go:41 — `source.LookupQuote(context.Background(), tenant, sku)` passes a background context instead of the caller’s `ctx`; this is the only added outbound quote lookup."
+        }
+      ],
+      "usage": {
+        "input_tokens": 3473,
+        "output_tokens": 225,
+        "total_tokens": 3698,
+        "reasoning_tokens": 99,
+        "cache_creation_tokens": 0,
+        "cache_read_tokens": 0
+      }
+    },
+    {
+      "rule_id": "tenant-cache",
+      "severity": "medium",
+      "verdict": "FAIL",
+      "findings": [
+        {
+          "file": "offers.go",
+          "line": 49,
+          "message": "The cache map is keyed only by SKU, not by both tenant ID and SKU."
+        },
+        {
+          "file": "offers.go",
+          "line": 57,
+          "message": "StoreQuote indexes the cache by SKU only, so quotes from different tenants with the same SKU share a key."
+        },
+        {
+          "file": "offers.go",
+          "line": 61,
+          "message": "LoadQuote indexes the cache by SKU only, so a tenant can load another tenant's quote for the same SKU."
+        }
+      ],
+      "checks": [
+        {
+          "requirement": "A cached quote must be keyed by both tenant ID and SKU so one tenant cannot read another tenant's cached quote.",
+          "status": "FAIL",
+          "evidence": "offers.go:49 — `quotes map[SKU]Quote` uses only SKU as the key; offers.go:57 — `cache.quotes[sku] = quote` stores by SKU only; offers.go:61 — `cache.quotes[sku]` loads by SKU only."
+        }
+      ],
+      "usage": {
+        "input_tokens": 3481,
+        "output_tokens": 368,
+        "total_tokens": 3849,
+        "reasoning_tokens": 153,
+        "cache_creation_tokens": 0,
+        "cache_read_tokens": 0
+      }
+    },
+    {
+      "rule_id": "offer-ties",
+      "severity": "medium",
+      "verdict": "FAIL",
+      "findings": [
+        {
+          "file": "offers.go",
+          "line": 69,
+          "message": "Tied-price offers are ordered by SKU, not by their original input order."
+        }
+      ],
+      "checks": [
+        {
+          "requirement": "Rank offers by ascending price.",
+          "status": "PASS",
+          "evidence": "offers.go:71 — `return ordered[i].Price < ordered[j].Price` compares unequal prices in ascending order."
+        },
+        {
+          "requirement": "Preserve the original input order when prices tie.",
+          "status": "FAIL",
+          "evidence": "offers.go:69 — `return ordered[i].SKU < ordered[j].SKU` orders tied offers by SKU rather than preserving their input order."
+        }
+      ],
+      "usage": {
+        "input_tokens": 3473,
+        "output_tokens": 341,
+        "total_tokens": 3814,
+        "reasoning_tokens": 197,
+        "cache_creation_tokens": 0,
+        "cache_read_tokens": 0
+      }
+    },
+    {
+      "rule_id": "input-ownership",
+      "severity": "medium",
+      "verdict": "PASS",
+      "findings": [],
+      "checks": [
+        {
+          "requirement": "Functions receiving an offer slice must not mutate the caller's slice or its elements",
+          "status": "PASS",
+          "evidence": "offers.go:65-80 — TopOffers copies offers with append(List(nil), offers...) before sorting; offers.go:82-90 — PageOffers only returns a subslice and does not modify the input."
+        }
+      ],
+      "usage": {
+        "input_tokens": 1170,
+        "output_tokens": 255,
+        "total_tokens": 3729,
+        "reasoning_tokens": 161,
+        "cache_creation_tokens": 0,
+        "cache_read_tokens": 2304
+      }
+    },
+    {
+      "rule_id": "lookup-errors",
+      "severity": "medium",
+      "verdict": "PASS",
+      "findings": [],
+      "checks": [
+        {
+          "requirement": "Wrap the original lookup error as the cause",
+          "status": "PASS",
+          "evidence": "offers.go:41-45 — inspected the lookup and its error path; line 43 wraps err with %w."
+        },
+        {
+          "requirement": "Include the operation in the wrapped error",
+          "status": "PASS",
+          "evidence": "offers.go:43 — the error message includes \"fetch quote\"."
+        },
+        {
+          "requirement": "Include the SKU in the wrapped error",
+          "status": "PASS",
+          "evidence": "offers.go:43 — the error message includes sku with %q."
+        }
+      ],
+      "usage": {
+        "input_tokens": 3476,
+        "output_tokens": 343,
+        "total_tokens": 3819,
+        "reasoning_tokens": 209,
+        "cache_creation_tokens": 0,
+        "cache_read_tokens": 0
+      }
+    }
+  ],
+  "correctness": {
+    "enabled": true,
+    "generator_usage": {
+      "input_tokens": 3370,
+      "output_tokens": 567,
+      "total_tokens": 3937,
+      "reasoning_tokens": 166,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 0
+    },
+    "check_usage": {
+      "input_tokens": 24923,
+      "output_tokens": 2058,
+      "total_tokens": 41573,
+      "reasoning_tokens": 717,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 14592
+    },
+    "usage": {
+      "input_tokens": 28293,
+      "output_tokens": 2625,
+      "total_tokens": 45510,
+      "reasoning_tokens": 883,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 14592
+    },
+    "hypotheses": [
+      {
+        "id": "H1",
+        "hunt": "Boundaries",
+        "at": "offers.go:87",
+        "question": "For three offers, does PageOffers(offers, 1, 2) or PageOffers(offers, 1, 3) return nil instead of the two available offers starting at offset 1?",
+        "look": "offers.go:82–90, PageOffers end calculation and length check",
+        "verdict": "CONFIRMED",
+        "evidence": [
+          "offers.go:87 — `if end >= len(offers) {` — rejects pages whose end equals the list length.",
+          "offers.go:88 — `return nil` — returns nil for those pages.",
+          "offers.go:90 — `return offers[int(offset):end]` — the slice that would otherwise return the available offers."
+        ],
+        "scenario": "Three offers: PageOffers(offers, 1, 2) computes end 3 and returns nil instead of offers[1:3]; PageOffers(offers, 1, 3) computes end 4 and also returns nil instead of the two remaining offers.",
+        "edit": "offers.go:87 — change `end >= len(offers)` to `end > len(offers)`.",
+        "usage": {
+          "input_tokens": 7233,
+          "output_tokens": 543,
+          "total_tokens": 11232,
+          "reasoning_tokens": 192,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 3456
+        }
+      },
+      {
+        "id": "H2",
+        "hunt": "Boundaries",
+        "at": "offers.go:94",
+        "question": "Does DiscountedCents(1000, 10) return zero instead of 900 because the percentage factor is divided using integer arithmetic before multiplication?",
+        "look": "offers.go:93–95, DiscountedCents",
+        "verdict": "CONFIRMED",
+        "evidence": [
+          "offers.go:94 — `return total * Cents((100-int(percent))/100)` — integer division makes the factor zero for a 10% discount before multiplication."
+        ],
+        "scenario": "DiscountedCents(1000, 10) -> 0 instead of 900",
+        "edit": "offers.go:94 — compute the percentage without integer truncation before applying it, e.g. `return total * Cents(100-int(percent)) / 100`",
+        "usage": {
+          "input_tokens": 9020,
+          "output_tokens": 618,
+          "total_tokens": 15142,
+          "reasoning_tokens": 274,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 5504
+        }
+      },
+      {
+        "id": "H3",
+        "hunt": "Absent values",
+        "at": "offers.go:61",
+        "question": "After storing a quote for tenant A and SKU X, can loading the previously absent quote for tenant B and SKU X return tenant A's quote with ok=true, or can storing tenant B's quote overwrite tenant A's entry?",
+        "look": "offers.go:48–62, QuoteCache.quotes, StoreQuote, LoadQuote",
+        "verdict": "CONFIRMED",
+        "evidence": [
+          "offers.go:49 — `quotes map[SKU]Quote` — the cache key is SKU only, not tenant plus SKU.",
+          "offers.go:57 — `cache.quotes[sku] = quote` — storing for a tenant writes the shared SKU entry.",
+          "offers.go:61 — `quote, ok := cache.quotes[sku]` — loading for a tenant reads that same SKU entry."
+        ],
+        "scenario": "StoreQuote(tenant A, SKU X, quote A), then LoadQuote(tenant B, SKU X) -> quote A, true.",
+        "edit": "offers.go:49,57,61 — key the cache by both tenant and SKU for store and load.",
+        "usage": {
+          "input_tokens": 3837,
+          "output_tokens": 434,
+          "total_tokens": 7599,
+          "reasoning_tokens": 136,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 3328
+        }
+      },
+      {
+        "id": "H4",
+        "hunt": "Error paths",
+        "at": "offers.go:41",
+        "question": "With an already-canceled caller context and a QuoteSource that returns ctx.Err() for canceled contexts but otherwise succeeds, can FetchQuote return success rather than the cancellation error because it passes context.Background() to LookupQuote?",
+        "look": "offers.go:32–45, QuoteSource.LookupQuote and FetchQuote",
+        "verdict": "CONFIRMED",
+        "evidence": [
+          "offers.go:40–41 — `FetchQuote(ctx context.Context, ...)` calls `source.LookupQuote(context.Background(), tenant, sku)` — the caller’s context is not passed to the source.",
+          "offers.go:42–45 — a nil lookup error leads to `return quote, nil` — the successful lookup is returned as success.",
+          "offers.go:33 — `LookupQuote(context.Context, TenantID, SKU) (Quote, error)` — the source receives the context supplied by `FetchQuote`.",
+          "offers.go:41 — `context.Background()` — positive control: the search for context/lookup symbols found this use and the `LookupQuote` declaration at offers.go:33."
+        ],
+        "scenario": "Caller context is already canceled; source returns success when given a non-canceled context -> FetchQuote returns the quote and nil error instead of cancellation.",
+        "edit": "offers.go:41 — pass `ctx` to `LookupQuote` instead of `context.Background()`.",
+        "usage": {
+          "input_tokens": 4833,
+          "output_tokens": 463,
+          "total_tokens": 7600,
+          "reasoning_tokens": 115,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 2304
+        }
+      }
+    ]
+  },
+  "parent_usage": {
+    "input_tokens": 2993,
+    "output_tokens": 1132,
+    "total_tokens": 8221,
+    "reasoning_tokens": 262,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 4096
+  },
+  "rules_usage": {
+    "input_tokens": 18556,
+    "output_tokens": 1834,
+    "total_tokens": 22694,
+    "reasoning_tokens": 926,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 2304
+  },
+  "total_usage": {
+    "input_tokens": 49842,
+    "output_tokens": 5591,
+    "total_tokens": 76425,
+    "reasoning_tokens": 2071,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 20992
+  },
+  "cost_estimate": {
+    "parts": [
+      {
+        "part": "parent",
+        "model": "gpt-6-luna",
+        "usage": {
+          "input_tokens": 2993,
+          "output_tokens": 1132,
+          "total_tokens": 8221,
+          "reasoning_tokens": 262,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 4096
+        },
+        "usd": 0.00090626,
+        "priced": true
+      },
+      {
+        "part": "rules",
+        "model": "gpt-6-luna",
+        "usage": {
+          "input_tokens": 18556,
+          "output_tokens": 1834,
+          "total_tokens": 22694,
+          "reasoning_tokens": 926,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 2304
+        },
+        "usd": 0.0027956400000000003,
+        "priced": true
+      },
+      {
+        "part": "correctness",
+        "model": "gpt-6.1-sol",
+        "usage": {
+          "input_tokens": 3370,
+          "output_tokens": 567,
+          "total_tokens": 3937,
+          "reasoning_tokens": 166,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 0
+        },
+        "usd": 0.012410000000000001,
+        "priced": true
+      },
+      {
+        "part": "correctness",
+        "model": "gpt-6-luna",
+        "usage": {
+          "input_tokens": 24923,
+          "output_tokens": 2058,
+          "total_tokens": 41573,
+          "reasoning_tokens": 717,
+          "cache_creation_tokens": 0,
+          "cache_read_tokens": 14592
+        },
+        "usd": 0.00366722,
+        "priced": true
+      }
+    ],
+    "per_part_usd": {
+      "correctness": 0.01607722,
+      "parent": 0.00090626,
+      "rules": 0.0027956400000000003
+    },
+    "per_model_usd": {
+      "gpt-6-luna": 0.00736912,
+      "gpt-6.1-sol": 0.012410000000000001
+    },
+    "total_usd": 0.01977912
+  }
+}

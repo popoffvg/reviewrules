@@ -5,7 +5,7 @@ An agent plugin runs the parent session and the forks on a backend that is not a
 - **Built-in plugins** `codex` and `claude` are compiled into reviewrules. They take the protocol request in-process and start only the `codex` or `claude` binary.
 - **Exec plugins** are executables in any language (a bash script is enough), named `reviewrules-agent-<name>`, in `plugin_dir`. `plugin_dir` is a key of the user config; the default is `~/.config/reviewrules/plugins`.
 
-reviewrules runs `reviewrules-agent-<name> start-parent|fork|append` with one JSON request on stdin and reads one JSON reply on stdout. A plugin MUST only read the repo. The full contract (operations, request and reply fields, errors, plugin rules, usage, tests) is in [agent-plugin-protocol.md](agent-plugin-protocol.md). To write a plugin, follow [skills/create-agent-plugin/SKILL.md](../skills/create-agent-plugin/SKILL.md).
+reviewrules runs `reviewrules-agent-<name> start-parent|fork|append` with one JSON request on stdin and reads one JSON reply on stdout. A plugin MUST only read the repo. The full contract (operations, request and reply fields, errors, plugin rules, usage, tests) is in [agent-plugin-protocol.md](agent-plugin-protocol.md). To write a plugin, follow [coding-agent-plugin/skills/create-agent-plugin/SKILL.md](../coding-agent-plugin/skills/create-agent-plugin/SKILL.md).
 
 ## Select a plugin
 
@@ -27,7 +27,7 @@ This repo has two exec plugins: `pi` in `plugins/pi/` and `opencode` in `plugins
 
 ## Codex and Claude plugins
 
-With `agent = "codex"` or `agent = "claude"` the built-in plugin runs the local binary with its own login. The tool passes every flag below itself; the steps in [Choose a backend](../README.md#choose-a-backend) are all you set up.
+With `agent = "codex"` or `agent = "claude"` the built-in plugin runs the local binary with its own login. The tool passes every flag below itself; the steps in [backend setup](backends.md) are all you set up.
 
 ### Codex
 

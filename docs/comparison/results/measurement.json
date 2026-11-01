@@ -1,0 +1,74 @@
+{
+  "date": "2026-11-01",
+  "codex_cli_version": "0.166.0",
+  "reviewrules_source_commit": "f299c3ba2b48096cdde81959a604e2a9dac08f1e",
+  "fixture_sha256": "74d3aa293e2848e007c811679c11221cb02bf0a50eed4467f7cec7d25b4610d9",
+  "diff_bytes": 2191,
+  "changed_files": 1,
+  "model": "gpt-6.1-sol",
+  "reasoning_effort": "high",
+  "order": [
+    "plain-codex",
+    "reviewrules-codex-sol",
+    "reviewrules-litellm-luna-sol"
+  ],
+  "runs_per_mode": 1,
+  "plain_codex": {
+    "wall_seconds": 47.407,
+    "exit_code": 0,
+    "seeded_defects_found": 6,
+    "passing_rule_controls": 2,
+    "verified_extra_defects": 1,
+    "uncached_input_tokens": 23645,
+    "cached_input_tokens": 89984,
+    "output_tokens": 1885,
+    "reasoning_output_tokens": 429,
+    "cli_invocations": 1,
+    "model_requests": 4
+  },
+  "usage_accounting": "Codex usage is summed from per-request session-log records. LiteLLM usage is summed from the provider-reported usage returned by the API backend. Output includes reasoning tokens.",
+  "reviewrules_codex_sol": {
+    "wall_seconds": 92.079,
+    "exit_code": 1,
+    "parallel": 4,
+    "seeded_defects_found": 6,
+    "passing_rule_controls": 2,
+    "verified_extra_defects": 0,
+    "uncached_input_tokens": 363827,
+    "cached_input_tokens": 625152,
+    "output_tokens": 6680,
+    "reasoning_output_tokens": 1853,
+    "cli_invocations": 12,
+    "model_requests": 26
+  },
+  "reviewrules_litellm": {
+    "wall_seconds": 43.505,
+    "exit_code": 1,
+    "backend": "fantasy",
+    "model": "gpt-6-luna",
+    "hypothesis_model": "gpt-6.1-sol",
+    "hypothesis_check_model": "gpt-6-luna",
+    "effort": "high",
+    "parallel": 4,
+    "review_tasks": 12,
+    "seeded_defects_found": 6,
+    "passing_rule_controls": 2,
+    "verified_extra_defects": 0,
+    "uncached_input_tokens": 49842,
+    "cached_input_tokens": 20992,
+    "output_tokens": 5591,
+    "reasoning_output_tokens": 2071,
+    "per_model": {
+      "gpt-6-luna": {
+        "uncached_input_tokens": 46472,
+        "cached_input_tokens": 20992,
+        "output_tokens": 5024
+      },
+      "gpt-6.1-sol": {
+        "uncached_input_tokens": 3370,
+        "cached_input_tokens": 0,
+        "output_tokens": 567
+      }
+    }
+  }
+}

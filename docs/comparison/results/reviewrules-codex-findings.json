@@ -1,0 +1,210 @@
+{
+  "model": "gpt-6.1-sol",
+  "rules": [
+    {
+      "rule_id": "money-rounding",
+      "severity": "medium",
+      "verdict": "FAIL",
+      "findings": [
+        {
+          "file": "offers.go",
+          "line": 37,
+          "message": "TotalCents rounds each unit price to cents before multiplying by quantity. Multiply the unit price by quantity first, then round the resulting total to cents."
+        }
+      ],
+      "checks": [
+        {
+          "requirement": "Round monetary order totals to the nearest cent after multiplying unit price by quantity, without rounding individual units first.",
+          "status": "FAIL",
+          "evidence": "Reviewed every added line in offers.go:2–95. The sole unit-price/quantity calculation is offers.go:37 — return Cents(math.Round(float64(price)*100)) * Cents(quantity). It rounds the unit price before multiplying by quantity."
+        }
+      ]
+    },
+    {
+      "rule_id": "caller-context",
+      "severity": "medium",
+      "verdict": "FAIL",
+      "findings": [
+        {
+          "file": "offers.go",
+          "line": 41,
+          "message": "Pass ctx instead of context.Background() to LookupQuote so the caller's cancellation and context values propagate."
+        }
+      ],
+      "checks": [
+        {
+          "requirement": "Pass the caller context to every outbound quote lookup so cancellation and context values propagate.",
+          "status": "FAIL",
+          "evidence": "Inspected every added line in offers.go (2–95); found one outbound quote lookup. offers.go:41 — quote, err := source.LookupQuote(context.Background(), tenant, sku) passes a background context instead of the caller's ctx declared at offers.go:40."
+        }
+      ]
+    },
+    {
+      "rule_id": "tenant-cache",
+      "severity": "medium",
+      "verdict": "FAIL",
+      "findings": [
+        {
+          "file": "offers.go",
+          "line": 49,
+          "message": "The cache map key contains only SKU, omitting tenant ID."
+        },
+        {
+          "file": "offers.go",
+          "line": 53,
+          "message": "The constructor allocates an SKU-only map rather than a cache keyed by tenant ID and SKU."
+        },
+        {
+          "file": "offers.go",
+          "line": 57,
+          "message": "StoreQuote ignores tenant ID and stores all tenants' quotes under the same SKU key."
+        },
+        {
+          "file": "offers.go",
+          "line": 61,
+          "message": "LoadQuote ignores tenant ID and can return another tenant's quote for the same SKU."
+        }
+      ],
+      "checks": [
+        {
+          "requirement": "A cached quote must be keyed by both tenant ID and SKU.",
+          "status": "FAIL",
+          "evidence": "Inspected all cache declarations and operations at offers.go:48–63. offers.go:49 — `quotes map[SKU]Quote`; offers.go:53 — `return &QuoteCache{quotes: make(map[SKU]Quote)}`; offers.go:57 — `cache.quotes[sku] = quote`; offers.go:61 — `quote, ok := cache.quotes[sku]`. Each key contains only SKU."
+        },
+        {
+          "requirement": "One tenant must never read another tenant's cached quote.",
+          "status": "FAIL",
+          "evidence": "Inspected the complete store and load paths at offers.go:56–63. offers.go:57 stores by SKU alone; offers.go:61 — `quote, ok := cache.quotes[sku]` ignores the supplied tenant. Storing a quote for tenant A and loading the same SKU for tenant B returns A's quote."
+        }
+      ]
+    },
+    {
+      "rule_id": "offer-ties",
+      "severity": "medium",
+      "verdict": "FAIL",
+      "findings": [
+        {
+          "file": "offers.go",
+          "line": 69,
+          "message": "Equal-price offers are ordered by SKU instead of preserving their original input order."
+        }
+      ],
+      "checks": [
+        {
+          "requirement": "Rank offers by ascending price.",
+          "status": "PASS",
+          "evidence": "Looked at all added lines in offers.go:2-95. The ranking path is TopOffers at offers.go:65-80: it copies the input, sorts with ordered[i].Price < ordered[j].Price at offers.go:71, and returns a prefix without reversing the order."
+        },
+        {
+          "requirement": "Preserve the original input order when prices tie.",
+          "status": "FAIL",
+          "evidence": "Looked at all added lines in offers.go:2-95, including the complete ranking path at offers.go:65-80. offers.go:69 — return ordered[i].SKU < ordered[j].SKU — orders equal-price offers by SKU, so equal-price input [B, A] becomes [A, B]."
+        }
+      ]
+    },
+    {
+      "rule_id": "input-ownership",
+      "severity": "medium",
+      "verdict": "PASS",
+      "findings": [],
+      "checks": [
+        {
+          "requirement": "Functions receiving an offer slice must not mutate the caller's slice.",
+          "status": "PASS",
+          "evidence": "Looked at every added line in both applicable functions: offers.go:65–80 (TopOffers) and offers.go:82–91 (PageOffers). TopOffers copies into ordered with append(List(nil), offers...) at offers.go:66, sorts that copy at offers.go:67, and reslices only ordered at offers.go:77. PageOffers checks bounds, computes end, and returns a subslice at offers.go:90 without writing to the input."
+        },
+        {
+          "requirement": "Functions receiving an offer slice must not mutate the caller's elements.",
+          "status": "PASS",
+          "evidence": "Looked at every added line in offers.go:65–80 and offers.go:82–91, plus the element definition at offers.go:25–28. Offer contains only SKU and Cents values. TopOffers copies those values at offers.go:66; its comparator only reads fields at offers.go:68–71. PageOffers performs no element assignments or field writes."
+        }
+      ]
+    },
+    {
+      "rule_id": "lookup-errors",
+      "severity": "medium",
+      "verdict": "PASS",
+      "findings": [],
+      "checks": [
+        {
+          "requirement": "Wrap outbound quote lookup errors with their original cause.",
+          "status": "PASS",
+          "evidence": "Inspected every added line in offers.go; the sole outbound lookup is at offers.go:41. Its error branch at offers.go:42 returns fmt.Errorf(\"fetch quote for SKU %q: %w\", sku, err) at offers.go:43, wrapping the original err with %w."
+        },
+        {
+          "requirement": "Include the operation in outbound quote lookup errors.",
+          "status": "PASS",
+          "evidence": "Inspected the sole added lookup error path, offers.go:41–43. The error at offers.go:43 includes the operation text \"fetch quote\"."
+        },
+        {
+          "requirement": "Include the SKU in outbound quote lookup errors.",
+          "status": "PASS",
+          "evidence": "Inspected the sole added lookup error path, offers.go:41–43. At offers.go:43, \"SKU %q\" formats the same sku passed to LookupQuote at offers.go:41."
+        }
+      ]
+    }
+  ],
+  "correctness": [
+    {
+      "id": "H1",
+      "hunt": "Boundaries",
+      "at": "offers.go:87",
+      "question": "With three offers and offset 1, does requesting size 2 or size 3 omit the two available offers?",
+      "look": "offers.go:82-90, PageOffers end calculation and return branches",
+      "verdict": "CONFIRMED",
+      "evidence": [
+        "offers.go:83 — if offset < 0 || size < 0 || int(offset) > len(offers) — both requested inputs pass the initial guard.",
+        "offers.go:86 — end := int(offset) + int(size) — offset 1 produces end 3 for size 2 and end 4 for size 3.",
+        "offers.go:87 — if end >= len(offers) { — both ends satisfy this condition when length is 3.",
+        "offers.go:88 — return nil — both requests omit the two available offers.",
+        "offers.go:90 — return offers[int(offset):end] — the slice-return path is unreachable for both inputs."
+      ],
+      "scenario": "Three offers, offset 1, size 2 or size 3 -> nil instead of the two available offers at indices 1 and 2.",
+      "edit": "offers.go:87 — replace the end-check block with if end > len(offers) { end = len(offers) }; retain the slice return at line 90."
+    },
+    {
+      "id": "H2",
+      "hunt": "Boundaries",
+      "at": "offers.go:94",
+      "question": "For total 1000 cents and discount 25 percent, does DiscountedCents return an amount other than the required 750 cents?",
+      "look": "offers.go:93-94, DiscountedCents integer division and multiplication",
+      "verdict": "CONFIRMED",
+      "evidence": [
+        "offers.go:94 — return total * Cents((100-int(percent))/100) — for percent 25, integer division computes 75/100 as 0; multiplying total by 0 returns 0, not 750."
+      ],
+      "scenario": "total=1000 cents, percent=25 -> 0 cents; required 750 cents",
+      "edit": "offers.go:94 — return total * Cents(100-int(percent)) / 100"
+    },
+    {
+      "id": "H3",
+      "hunt": "Absent values",
+      "at": "offers.go:61",
+      "question": "After storing a quote for tenant A and SKU X, can loading tenant B's never-stored quote for SKU X return tenant A's quote with the presence flag true?",
+      "look": "offers.go:48-62, QuoteCache map key, StoreQuote, LoadQuote",
+      "verdict": "CONFIRMED",
+      "evidence": [
+        "offers.go:49 — quotes map[SKU]Quote — the cache key contains only the SKU.",
+        "offers.go:57 — cache.quotes[sku] = quote — storing tenant A's quote writes under SKU X.",
+        "offers.go:61 — quote, ok := cache.quotes[sku] — loading for tenant B reads the same entry using only SKU X.",
+        "offers.go:62 — return quote, ok — returns tenant A's quote with true."
+      ],
+      "scenario": "On one new cache, StoreQuote(A, X, quoteA), then LoadQuote(B, X) -> (quoteA, true), although B's quote was never stored.",
+      "edit": "offers.go:49,53,57,61 — key the map by a struct containing both TenantID and SKU; update its initialization and both accesses to use that composite key."
+    },
+    {
+      "id": "H4",
+      "hunt": "Error paths",
+      "at": "offers.go:41",
+      "question": "With an already-canceled caller context and a source that returns a cancellation error only when its received context is canceled, can FetchQuote return a successful quote instead of the cancellation error?",
+      "look": "offers.go:32-45, QuoteSource.LookupQuote context argument and FetchQuote error handling",
+      "verdict": "CONFIRMED",
+      "evidence": [
+        "offers.go:41 — quote, err := source.LookupQuote(context.Background(), tenant, sku) — the source receives an uncanceled background context instead of the caller's ctx.",
+        "offers.go:42-43 — if err != nil { return Quote{}, fmt.Errorf(\"fetch quote for SKU %q: %w\", sku, err) } — cancellation is propagated only if the source returns an error.",
+        "offers.go:45 — return quote, nil — a successful source response is returned as success."
+      ],
+      "scenario": "Already-canceled caller ctx + source that returns a cancellation error for canceled contexts and a quote otherwise -> source receives context.Background(), and FetchQuote returns the quote with nil error.",
+      "edit": "offers.go:41 — replace context.Background() with ctx in source.LookupQuote(ctx, tenant, sku)."
+    }
+  ]
+}

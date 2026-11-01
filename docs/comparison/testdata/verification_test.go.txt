@@ -1,0 +1,73 @@
+package offers
+
+import (
+ "context"
+ "errors"
+ "reflect"
+ "strings"
+ "testing"
+)
+
+type contextProbe struct {
+ received context.Context
+ failure error
+}
+
+func (probe *contextProbe) LookupQuote(ctx context.Context, _ TenantID, sku SKU) (Quote, error) {
+ probe.received = ctx
+ return Quote{SKU: sku, Price: 100}, probe.failure
+}
+
+func TestMoneyRounding(t *testing.T) {
+ got := TotalCents(0.335, 3)
+ if got != 101 { t.Fatalf("got %d cents, want 101", got) }
+}
+
+func TestCallerContext(t *testing.T) {
+ ctx, cancel := context.WithCancel(t.Context())
+ cancel()
+ probe := &contextProbe{}
+ _, _ = FetchQuote(ctx, probe, "tenant-a", "book")
+ if probe.received != ctx { t.Fatal("lookup did not receive caller context") }
+}
+
+func TestTenantCache(t *testing.T) {
+ cache := NewQuoteCache()
+ cache.StoreQuote("tenant-a", "book", Quote{SKU: "book", Price: 100})
+ _, found := cache.LoadQuote("tenant-b", "book")
+ if found { t.Fatal("tenant-b read tenant-a quote") }
+}
+
+func TestOfferTies(t *testing.T) {
+ input := List{{SKU: "z", Price: 100}, {SKU: "a", Price: 100}}
+ got := TopOffers(input, 2)
+ if !reflect.DeepEqual(got, input) { t.Fatalf("tie order changed: %v", got) }
+}
+
+func TestPageBoundary(t *testing.T) {
+ input := List{{SKU: "a", Price: 100}, {SKU: "b", Price: 200}}
+ got := PageOffers(input, 1, 1)
+ if !reflect.DeepEqual(got, input[1:]) { t.Fatalf("last page lost: %v", got) }
+}
+
+func TestPercentageDiscount(t *testing.T) {
+ got := DiscountedCents(1000, 10)
+ if got != 900 { t.Fatalf("got %d cents, want 900", got) }
+}
+
+func TestInputOwnership(t *testing.T) {
+ input := List{{SKU: "z", Price: 200}, {SKU: "a", Price: 100}}
+ before := append(List(nil), input...)
+ _ = TopOffers(input, 1)
+ _ = PageOffers(input, 0, 1)
+ if !reflect.DeepEqual(input, before) { t.Fatalf("caller slice mutated: %v", input) }
+}
+
+func TestLookupErrors(t *testing.T) {
+ cause := errors.New("source unavailable")
+ probe := &contextProbe{failure: cause}
+ _, err := FetchQuote(t.Context(), probe, "tenant-a", "book")
+ if !errors.Is(err, cause) || !strings.Contains(err.Error(), "fetch quote") || !strings.Contains(err.Error(), "book") {
+  t.Fatalf("missing error context or cause: %v", err)
+ }
+}
