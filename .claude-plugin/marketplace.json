@@ -1,0 +1,11 @@
+{
+  "name": "reviewrules",
+  "owner": { "name": "Vitalii Popov" },
+  "plugins": [
+    {
+      "name": "reviewrules",
+      "source": "./coding-agent-plugin",
+      "description": "Run reviewrules on a git diff and act on its verdicts; write an agent plugin for it."
+    }
+  ]
+}

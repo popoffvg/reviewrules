@@ -18,6 +18,7 @@ reviewrules reviews a git diff against the rules in `.reviewrules/` and in the e
 | `internal/agentplugin` | the agent plugin protocol (`PluginRequest`, `PluginReply`), the `AgentPlugin` interface, `PluginForkAgent`, and the exec adapter `ExecAgentPlugin` |
 | `internal/agentplugin/codexplugin` | the built-in `codex` plugin |
 | `internal/agentplugin/claudeplugin` | the built-in `claude` plugin |
+| `coding-agent-plugin` | the Claude Code and Codex plugin `reviewrules` (`.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`) and its skills; the marketplaces that list it are `.claude-plugin/marketplace.json` and `.agents/plugins/marketplace.json` at the repo root. Change the `version` in both plugin manifests together |
 
 ### Run flow
 
@@ -44,7 +45,7 @@ The user doc is [docs/agent-plugins.md](docs/agent-plugins.md). The protocol and
 
 ### Add a backend
 
-- **Exec plugin** (any language, no reviewrules change): follow `skills/create-agent-plugin/SKILL.md`.
+- **Exec plugin** (any language, no reviewrules change): follow `coding-agent-plugin/skills/create-agent-plugin/SKILL.md`.
 - **Built-in plugin**: add a package `internal/agentplugin/<name>plugin` with a type that implements `agentplugin.AgentPlugin`, add the name to `reviewsettings.ReviewAgentKind`, and add one row to `builtinAgentPlugins()` in `main.go`.
 - **API backend** (OpenAI-compatible endpoint): add one row to `reviewEndpoints()` in `main.go`.
 

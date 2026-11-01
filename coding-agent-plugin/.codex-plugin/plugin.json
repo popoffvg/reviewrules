@@ -1,0 +1,19 @@
+{
+  "name": "reviewrules",
+  "version": "0.2.0",
+  "description": "Run reviewrules on a git diff and act on its verdicts; write an agent plugin for it; find the rules a linter can check.",
+  "author": { "name": "Vitalii Popov" },
+  "repository": "https://github.com/popoffvg/reviewrules",
+  "license": "MIT",
+  "keywords": ["code-review", "rules", "git-diff"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "reviewrules",
+    "shortDescription": "Per-rule LLM review of a git diff",
+    "longDescription": "Install and run reviewrules on the current branch, read the per-rule verdicts and the exit code, and write an agent plugin for a new backend.",
+    "developerName": "Vitalii Popov",
+    "category": "Coding",
+    "capabilities": ["Read", "Write"],
+    "defaultPrompt": ["Review my branch against the .reviewrules rules."]
+  }
+}

@@ -43,4 +43,4 @@ A `FAIL` below `fail_on` (default `medium`) does not fail the run. Report it, bu
 
 ## CI
 
-With `CI=true` the tool reads the `[ci]` case of the user config (the job writes it, or passes `--config` with a committed file), writes the JSON report to stdout, and writes the summary to stderr. Use `--json-out <file>` to keep stdout free. The CI job MUST check out the full history (`fetch-depth: 0`) and pin the install to a commit SHA or a tag: `go install github.com/popoffvg/reviewrules@<sha or tag>`. The full workflow is in the README section "Run in CI".
+With `CI=true` the tool reads the `[ci]` case of the user config (the job writes it, or passes `--config` with a committed file), writes the JSON report to stdout, and writes the summary to stderr. Use `--json-out <file>` to keep stdout free. The CI job MUST check out the full history (`fetch-depth: 0`) and pin the install to a commit SHA or a tag: `go install github.com/popoffvg/reviewrules@<sha or tag>`. The full workflow is in `docs/ci.md`.
