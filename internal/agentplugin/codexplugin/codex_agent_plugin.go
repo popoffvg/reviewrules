@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/popoffvg/background/launch"
 
@@ -20,12 +21,47 @@ var _ agentplugin.AgentPlugin = (*CodexAgentPlugin)(nil)
 // codex keeps its own base instructions (a session override of base_instructions is ignored),
 // so the system prompt goes in developer_instructions.
 type CodexAgentPlugin struct {
-	binary string
+	binary      string
+	mu          sync.Mutex
+	threadUsage map[string]codexCumulativeUsage
 }
 
 // NewCodexAgentPlugin builds the plugin; binary is "codex" or a path to it.
 func NewCodexAgentPlugin(binary string) *CodexAgentPlugin {
-	return &CodexAgentPlugin{binary: binary}
+	return &CodexAgentPlugin{binary: binary, threadUsage: make(map[string]codexCumulativeUsage)}
+}
+
+type codexCumulativeUsage struct {
+	uncachedInput int64
+	cachedInput   int64
+	output        int64
+	reasoning     int64
+}
+
+func codexCumulativeFromEvent(event codexExecEvent) codexCumulativeUsage {
+	return codexCumulativeUsage{
+		uncachedInput: event.Usage.InputTokens - event.Usage.CachedInputTokens,
+		cachedInput:   event.Usage.CachedInputTokens,
+		output:        event.Usage.OutputTokens,
+		reasoning:     event.Usage.ReasoningOutputTokens,
+	}
+}
+
+func (prev codexCumulativeUsage) delta(next codexCumulativeUsage) agentplugin.PluginUsage {
+	return agentplugin.PluginUsage{
+		InputTokens:       next.uncachedInput - prev.uncachedInput,
+		CachedInputTokens: next.cachedInput - prev.cachedInput,
+		OutputTokens:      next.output - prev.output,
+		ReasoningTokens:   next.reasoning - prev.reasoning,
+	}
+}
+
+func addPluginUsage(total, more agentplugin.PluginUsage) agentplugin.PluginUsage {
+	total.InputTokens += more.InputTokens
+	total.CachedInputTokens += more.CachedInputTokens
+	total.OutputTokens += more.OutputTokens
+	total.ReasoningTokens += more.ReasoningTokens
+	return total
 }
 
 type codexExecEvent struct {
@@ -101,6 +137,10 @@ func (p *CodexAgentPlugin) runCodex(
 			"codex run exited with %d: %s", run.ExitCode, strings.TrimSpace(stderr.String()),
 		)
 	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	baseline := p.threadUsage[request.SessionID]
+	prev := baseline
 	var reply agentplugin.PluginReply
 	scanner := bufio.NewScanner(&stdout)
 	scanner.Buffer(make([]byte, 0, 1024*1024), 16*1024*1024)
@@ -115,15 +155,14 @@ func (p *CodexAgentPlugin) runCodex(
 		case event.Type == "item.completed" && event.Item.Type == "agent_message":
 			reply.Text = event.Item.Text
 		case event.Type == "turn.completed":
-			// codex input_tokens counts the cached tokens too.
-			reply.Usage.InputTokens += event.Usage.InputTokens - event.Usage.CachedInputTokens
-			reply.Usage.CachedInputTokens += event.Usage.CachedInputTokens
-			reply.Usage.OutputTokens += event.Usage.OutputTokens
-			reply.Usage.ReasoningTokens += event.Usage.ReasoningOutputTokens
+			next := codexCumulativeFromEvent(event)
+			reply.Usage = addPluginUsage(reply.Usage, prev.delta(next))
+			prev = next
 		}
 	}
 	if reply.SessionID == "" {
 		return reply, fmt.Errorf("codex output has no thread.started event: %s", strings.TrimSpace(stderr.String()))
 	}
+	p.threadUsage[reply.SessionID] = prev
 	return reply, nil
 }
