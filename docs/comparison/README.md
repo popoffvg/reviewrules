@@ -1,62 +1,36 @@
-# Comparison inputs
+# Reproduce the comparison example
 
-These files reproduce the small example in [the comparison](../comparison.md). `testdata/offers.go` intentionally contains defects. It is an evaluation input, not application code.
+This directory holds the [controlled example](../comparison.md): rules, fixture source, configs, and reference tests. Nothing here is production code for reviewrules itself.
 
-## Prepare the reviewed repository
+## 1. Build a temporary repository
 
-In a temporary directory, create a Git repository with a `main` branch. Its initial commit contains:
+In an empty directory:
 
-- `go.mod`: module `comparison.example/offers`, Go `1.27`;
-- `offers.go`: only `package offers`;
-- `.reviewrules/config.json`: a copy of [rules.json](testdata/rules.json).
+1. `git init` and commit `main` with `go.mod` (`module comparison.example/offers`, Go 1.27), `offers.go` containing only `package offers`, and `.reviewrules/config.json` copied from [`testdata/rules.json`](testdata/rules.json).
+2. Replace `offers.go` with [`testdata/offers.go`](testdata/offers.go) and leave it uncommitted.
+3. Add `.reviewrules/settings.toml` with `fail_on_unanswered = true`.
 
-Replace `offers.go` with [the fixture](testdata/offers.go). Leave it uncommitted. Create `.reviewrules/settings.toml` with `fail_on_unanswered = true`.
+Keep [`testdata/verification_test.go.txt`](testdata/verification_test.go.txt) **outside** that repository when you run the reviews.
 
-Keep reference tests outside the reviewed repository. Both reviewers can inspect every file in that repository, so placing answers there would contaminate the experiment.
+## 2. Plain Codex baseline
 
-## Plain Codex input
+Use [`baseline-prompt.md`](baseline-prompt.md) plus the rule JSON and diff. Run one read-only `codex exec` with `gpt-6.1-sol` at high effort. Set `developer_instructions` from [`internal/prompts/review_system.md`](../../internal/prompts/review_system.md) and `-c project_doc_max_bytes=0`.
 
-Use [the baseline prompt](baseline-prompt.md), with the rule config and diff appended. The [exact recorded input](results/baseline-input.md) is available. Run one `codex exec` session with:
+## 3. reviewrules
 
-```text
---json --skip-git-repo-check -s read-only
--c project_doc_max_bytes=0
--m gpt-6.1-sol
--c model_reasoning_effort=high
-```
+**LiteLLM:** start the proxy per [`litellm.md`](../litellm.md), set `LITELLM_API_KEY`, and run with [`testdata/reviewrules.toml`](testdata/reviewrules.toml).
 
-Set `developer_instructions` to the contents of [`internal/prompts/review_system.md`](../../internal/prompts/review_system.md). The recorded run used `background/launch.Run` for process logging.
+**Codex CLI:** use [`testdata/reviewrules-codex-sol.toml`](testdata/reviewrules-codex-sol.toml) and `agent = "codex"` in your user config.
 
-## reviewrules through LiteLLM
-
-Start the proxy using [the LiteLLM guide](../litellm.md). Use [reviewrules.toml](testdata/reviewrules.toml), which selects Luna for the parent, rules, and hypothesis checks, and Sol for hypothesis generation.
-
-From the temporary repository, with `LITELLM_API_KEY` set to the proxy key:
+Example:
 
 ```bash
-reviewrules --repo /path/to/temporary/repo --base main --worktree \
-  --config /path/to/reviewrules.toml --json-out /path/outside/repo/report.json
+reviewrules --repo /path/to/temp/repo --base main --worktree \
+  --config /path/to/reviewrules.toml --json-out /tmp/report.json
 ```
 
-For the additional all-Sol Codex-backend run, use [reviewrules-codex-sol.toml](testdata/reviewrules-codex-sol.toml) instead. Run setups sequentially. Capture wall time, final answers, the JSON report, and per-request Codex session usage. The model-request count differs from the CLI-invocation count because tools require continuations.
+## 4. Check findings (optional)
 
-## Reference checks
+Copy the fixture and `go.mod` to another directory, add the verification test file as `offers_test.go`, and run `go test ./...`. Six tests should fail on the buggy fixture and pass after the fixes described in the test file. The overflow check in [`testdata/additional_checks_test.go.txt`](testdata/additional_checks_test.go.txt) is separate from the six seeded defects.
 
-Copy `go.mod` and the fixture into another temporary directory. Copy [verification_test.go.txt](testdata/verification_test.go.txt) there as `offers_test.go`. Run `go test -json -count=1 ./...` in the background and save its output outside the reviewed repository.
-
-Expected failures are `TestMoneyRounding`, `TestCallerContext`, `TestTenantCache`, `TestOfferTies`, `TestPageBoundary`, and `TestPercentageDiscount`. `TestInputOwnership` and `TestLookupErrors` must pass.
-
-For the positive control, make these six corrections in that separate copy:
-
-| Defect | Correction |
-|---|---|
-| Per-unit rounding | Multiply price by quantity before rounding to cents. |
-| Lost context | Pass `ctx` to `LookupQuote`. |
-| Tenant cache collision | Use both `TenantID` and `SKU` in the map key. |
-| Reordered ties | Use a stable price-only sort. |
-| Lost final page | Clamp an end beyond the length; allow an end equal to the length. |
-| Integer discount division | Multiply total by the remaining percentage before dividing by 100. |
-
-All eight checks must then pass. Match findings to defect behavior, not line proximity. Count duplicates once. Inspect additional findings separately; the six seeded defects are not an exhaustive catalogue of possible input extremes.
-
-The extra overflow finding was verified after the reviews using [additional_checks_test.go.txt](testdata/additional_checks_test.go.txt). Cap `size` to `len(offers)-int(offset)` before calculating `offset + size` to fix it. This check was not part of the original six-defect reference set.
+Recorded numbers for the run that produced this doc set are in [`results/measurement.json`](results/measurement.json).

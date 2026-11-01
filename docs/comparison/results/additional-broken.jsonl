@@ -1,9 +1,0 @@
-{"Time":"2026-11-01T19:22:36.457232+01:00","Action":"start","Package":"comparison.example/offers"}
-{"Time":"2026-11-01T19:22:36.463188+01:00","Action":"run","Package":"comparison.example/offers","Test":"TestPageOffsetOverflow"}
-{"Time":"2026-11-01T19:22:36.463259+01:00","Action":"output","Package":"comparison.example/offers","Test":"TestPageOffsetOverflow","Output":"=== RUN   TestPageOffsetOverflow\n","OutputType":"frame"}
-{"Time":"2026-11-01T19:22:36.4633+01:00","Action":"output","Package":"comparison.example/offers","Test":"TestPageOffsetOverflow","Output":"    additional_checks_test.go:12: valid page request panicked: runtime error: slice bounds out of range [:-9223372036854775808]\n","OutputType":"error"}
-{"Time":"2026-11-01T19:22:36.463307+01:00","Action":"output","Package":"comparison.example/offers","Test":"TestPageOffsetOverflow","Output":"--- FAIL: TestPageOffsetOverflow (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-11-01T19:22:36.463309+01:00","Action":"fail","Package":"comparison.example/offers","Test":"TestPageOffsetOverflow","Elapsed":0}
-{"Time":"2026-11-01T19:22:36.463322+01:00","Action":"output","Package":"comparison.example/offers","Output":"FAIL\n","OutputType":"frame"}
-{"Time":"2026-11-01T19:22:36.463959+01:00","Action":"output","Package":"comparison.example/offers","Output":"FAIL\tcomparison.example/offers\t0.006s\n","OutputType":"frame"}
-{"Time":"2026-11-01T19:22:36.463987+01:00","Action":"fail","Package":"comparison.example/offers","Elapsed":0.007}

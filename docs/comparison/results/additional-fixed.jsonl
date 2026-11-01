@@ -1,8 +1,0 @@
-{"Time":"2026-11-01T19:22:36.662382+01:00","Action":"start","Package":"comparison.example/offers"}
-{"Time":"2026-11-01T19:22:36.667716+01:00","Action":"run","Package":"comparison.example/offers","Test":"TestPageOffsetOverflow"}
-{"Time":"2026-11-01T19:22:36.66779+01:00","Action":"output","Package":"comparison.example/offers","Test":"TestPageOffsetOverflow","Output":"=== RUN   TestPageOffsetOverflow\n","OutputType":"frame"}
-{"Time":"2026-11-01T19:22:36.667827+01:00","Action":"output","Package":"comparison.example/offers","Test":"TestPageOffsetOverflow","Output":"--- PASS: TestPageOffsetOverflow (0.00s)\n","OutputType":"frame"}
-{"Time":"2026-11-01T19:22:36.667829+01:00","Action":"pass","Package":"comparison.example/offers","Test":"TestPageOffsetOverflow","Elapsed":0}
-{"Time":"2026-11-01T19:22:36.667834+01:00","Action":"output","Package":"comparison.example/offers","Output":"PASS\n","OutputType":"frame"}
-{"Time":"2026-11-01T19:22:36.668249+01:00","Action":"output","Package":"comparison.example/offers","Output":"ok  \tcomparison.example/offers\t0.006s\n"}
-{"Time":"2026-11-01T19:22:36.668261+01:00","Action":"pass","Package":"comparison.example/offers","Elapsed":0.006}
