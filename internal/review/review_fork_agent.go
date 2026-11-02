@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"charm.land/fantasy"
-	"github.com/popoffvg/reviewrules/internal/prompts"
 )
 
 // ReviewForkAgent runs one parent session that holds the diff and forks it once per rule and per
@@ -49,13 +48,14 @@ func forkReplyJSON(
 	fork ForkReply,
 	requiredKey string,
 	target any,
+	retryPrompt string,
 ) (fantasy.Usage, string, error) {
 	if decodeForkJSONReply(fork.Text, requiredKey, target) == nil {
 		return fantasy.Usage{}, fork.Text, nil
 	}
 	retrySettings := settings
 	retrySettings.MaxSteps = 1
-	retry, err := agent.AppendToFork(ctx, fork.ForkID, prompts.JSONOnlyRetry, retrySettings)
+	retry, err := agent.AppendToFork(ctx, fork.ForkID, retryPrompt, retrySettings)
 	if err != nil {
 		return retry.Usage, fork.Text, fmt.Errorf("fork JSON retry failed: %w", err)
 	}

@@ -33,6 +33,7 @@ reviewrules has five flags and `--print-config` (see the Flags table in `README.
 | `parent_steps` | `~/.config/reviewrules/config.toml` | `8` | tool-call steps for the parent session |
 | `fork_steps` | `~/.config/reviewrules/config.toml` | `8` | tool-call steps for each fork (not used by codex) |
 | `plugin_dir` | `~/.config/reviewrules/config.toml` | `~/.config/reviewrules/plugins` | folder of the exec agent plugins, named reviewrules-agent-&lt;agent&gt; |
+| `prompts_dir` | `~/.config/reviewrules/config.toml` | `built-in prompts` | folder of prompt files that replace the built-in agent prompts; a file keeps its built-in name; empty uses the built-in prompts |
 | `claude_binary` | `~/.config/reviewrules/config.toml` | `"claude"` | claude binary for the claude agent |
 | `codex_binary` | `~/.config/reviewrules/config.toml` | `"codex"` | codex binary for the codex agent |
 | `prices` | `~/.config/reviewrules/config.toml` | `built in for the default models` | per-model price table [&lt;case&gt;.prices."&lt;model&gt;"] with input, cached, output in USD per 1M tokens; an entry replaces the built-in price |
@@ -95,6 +96,7 @@ parallel = 4
 parent_steps = 8
 fork_steps = 8
 plugin_dir = "~/.config/reviewrules/plugins"
+prompts_dir = ""
 claude_binary = "claude"
 codex_binary = "codex"
 
@@ -110,7 +112,23 @@ hypothesis_model = "openai/gpt-6.1-sol"
 parallel = 8
 ```
 
-Write `plugin_dir` as an absolute path: reviewrules does not expand `~`. A relative path is relative to the current directory of reviewrules.
+Write `plugin_dir` and `prompts_dir` as absolute paths: reviewrules does not expand `~`. A relative path is relative to the current directory of reviewrules.
+
+### Agent prompts
+
+`prompts_dir` is a folder of prompt files. A file whose name matches a built-in prompt replaces that prompt for the run. A missing file keeps the built-in text. An empty `prompts_dir` uses the built-in prompts. Any other file name, an empty file, or a template that does not parse stops the run with exit code 2.
+
+| File | Replaces |
+|---|---|
+| `review_system.md` | the system prompt of every call |
+| `parent_session.md.tmpl` | the parent session |
+| `rule_check.md.tmpl` | one rule check |
+| `hypothesis_generator.md` | the hypothesis list |
+| `hypothesis_check.md.tmpl` | one hypothesis check |
+| `json_only_retry.md` | the retry when a reply has no JSON block |
+| `last_step_answer.md` | the last tool step of an API backend |
+
+The `.tmpl` files are Go templates with the same fields as the built-in files. A check still answers with the JSON block the built-in prompt names: reviewrules reads the checks, not a free-form verdict.
 
 ### The `[local]` and `[ci]` cases
 

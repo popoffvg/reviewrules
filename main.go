@@ -22,6 +22,7 @@ import (
 	"github.com/popoffvg/reviewrules/internal/agentplugin"
 	"github.com/popoffvg/reviewrules/internal/agentplugin/claudeplugin"
 	"github.com/popoffvg/reviewrules/internal/agentplugin/codexplugin"
+	"github.com/popoffvg/reviewrules/internal/prompts"
 	"github.com/popoffvg/reviewrules/internal/review"
 	"github.com/popoffvg/reviewrules/internal/reviewcli"
 	"github.com/popoffvg/reviewrules/internal/reviewsettings"
@@ -65,6 +66,11 @@ func runReviewRules() int {
 		logger.Error("reviewrules rule set cache dir failed", "error", err)
 		return 2
 	}
+	agentPrompts, err := prompts.Load(config.User.PromptsDir)
+	if err != nil {
+		logger.Error("reviewrules prompts load failed", "error", err)
+		return 2
+	}
 	if options.PrintConfig {
 		err = config.WriteMergedConfig(os.Stdout, cachedRuleSetCommits(ruleSetCacheDir, config.Repo.RuleSets))
 		if err != nil {
@@ -79,7 +85,7 @@ func runReviewRules() int {
 		return 2
 	}
 	userConfig := config.User
-	newAgent, err := newReviewForkAgentFactory(userConfig, root)
+	newAgent, err := newReviewForkAgentFactory(userConfig, root, agentPrompts)
 	if err != nil {
 		logger.Error("reviewrules agent setup failed", "error", err)
 		return 2
@@ -109,6 +115,7 @@ func runReviewRules() int {
 		ParentMaxSteps:           userConfig.ParentSteps,
 		ForkMaxSteps:             userConfig.ForkSteps,
 		CorrectnessEnabled:       config.Repo.Correctness,
+		Prompts:                  agentPrompts,
 	})
 	if err != nil {
 		logger.Error("reviewrules run failed", "error", err)
@@ -152,10 +159,10 @@ func runReviewRules() int {
 
 // newReviewForkAgentFactory picks the backend the user config names: an API backend, then a built-in
 // agent plugin, then the exec plugin of that name in the plugin folder.
-func newReviewForkAgentFactory(settings reviewsettings.UserConfig, repoRoot string) (review.ReviewForkAgentFactory, error) {
+func newReviewForkAgentFactory(settings reviewsettings.UserConfig, repoRoot string, text prompts.Set) (review.ReviewForkAgentFactory, error) {
 	for _, endpoint := range reviewEndpoints() {
 		if endpoint.agent == settings.Agent {
-			return newEndpointAgentFactory(settings, endpoint, repoRoot)
+			return newEndpointAgentFactory(settings, endpoint, repoRoot, text)
 		}
 	}
 	plugin, err := selectAgentPlugin(settings)
@@ -163,7 +170,7 @@ func newReviewForkAgentFactory(settings reviewsettings.UserConfig, repoRoot stri
 		return nil, err
 	}
 	return func(promptCacheKey string) review.ReviewForkAgent {
-		return agentplugin.NewPluginForkAgent(plugin, repoRoot, promptCacheKey)
+		return agentplugin.NewPluginForkAgent(plugin, repoRoot, promptCacheKey, text.ReviewSystem)
 	}, nil
 }
 
@@ -214,6 +221,7 @@ func newEndpointAgentFactory(
 	settings reviewsettings.UserConfig,
 	endpoint reviewEndpoint,
 	repoRoot string,
+	text prompts.Set,
 ) (review.ReviewForkAgentFactory, error) {
 	baseURL := endpoint.baseURL
 	if baseURL == "" || settings.BaseURL != reviewsettings.DefaultUserConfig().BaseURL {
@@ -232,7 +240,7 @@ func newEndpointAgentFactory(
 		return nil, err
 	}
 	return func(promptCacheKey string) review.ReviewForkAgent {
-		return review.NewFantasyForkAgent(provider, repoRoot, promptCacheKey, endpoint.liteLLMSession)
+		return review.NewFantasyForkAgent(provider, repoRoot, promptCacheKey, endpoint.liteLLMSession, text)
 	}, nil
 }
 

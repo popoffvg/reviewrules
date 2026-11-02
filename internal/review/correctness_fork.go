@@ -59,13 +59,14 @@ func GenerateHypothesesInFork(
 	ctx context.Context,
 	agent ReviewForkAgent,
 	settings ForkSettings,
+	text prompts.Set,
 ) ([]Hypothesis, fantasy.Usage, error) {
-	fork, err := agent.ForkParentSession(ctx, prompts.HypothesisGenerator, settings)
+	fork, err := agent.ForkParentSession(ctx, text.HypothesisGenerator, settings)
 	if err != nil {
 		return nil, fantasy.Usage{}, fmt.Errorf("hypothesis generator fork failed: %w", err)
 	}
 	var reply hypothesisListReply
-	retryUsage, _, err := forkReplyJSON(ctx, agent, settings, fork, "hypotheses", &reply)
+	retryUsage, _, err := forkReplyJSON(ctx, agent, settings, fork, "hypotheses", &reply, text.JSONOnlyRetry)
 	usage := AddUsage(fork.Usage, retryUsage)
 	if err != nil {
 		return nil, usage, fmt.Errorf("hypothesis generator reply: %w", err)
@@ -89,13 +90,14 @@ func CheckHypothesisInFork(
 	agent ReviewForkAgent,
 	settings ForkSettings,
 	hypothesis Hypothesis,
+	text prompts.Set,
 ) HypothesisCheck {
 	check := HypothesisCheck{
 		Hypothesis: hypothesis,
 		Verdict:    HypothesisVerdictUnsure,
 		Evidence:   []string{},
 	}
-	prompt := prompts.HypothesisCheck(prompts.HypothesisCheckInput{
+	prompt := text.HypothesisCheck(prompts.HypothesisCheckInput{
 		ID:       hypothesis.ID,
 		At:       hypothesis.At,
 		Question: hypothesis.Question,
@@ -107,7 +109,7 @@ func CheckHypothesisInFork(
 		return check
 	}
 	var reply hypothesisCheckReply
-	retryUsage, _, err := forkReplyJSON(ctx, agent, settings, fork, "verdict", &reply)
+	retryUsage, _, err := forkReplyJSON(ctx, agent, settings, fork, "verdict", &reply, text.JSONOnlyRetry)
 	check.Usage = AddUsage(fork.Usage, retryUsage)
 	if err != nil {
 		check.Error = err.Error()

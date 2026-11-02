@@ -54,6 +54,7 @@ type UserConfig struct {
 	ParentSteps          int                               `toml:"parent_steps"           description:"tool-call steps for the parent session"`
 	ForkSteps            int                               `toml:"fork_steps"             description:"tool-call steps for each fork (not used by codex)"`
 	PluginDir            string                            `toml:"plugin_dir"             description:"folder of the exec agent plugins, named reviewrules-agent-<agent>"                                                         default-text:"~/.config/reviewrules/plugins"`
+	PromptsDir           string                            `toml:"prompts_dir"            description:"folder of prompt files that replace the built-in agent prompts; a file keeps its built-in name; empty uses the built-in prompts" default-text:"built-in prompts"`
 	ClaudeBinary         string                            `toml:"claude_binary"          description:"claude binary for the claude agent"`
 	CodexBinary          string                            `toml:"codex_binary"           description:"codex binary for the codex agent"`
 	Prices               map[string]review.ModelTokenPrice `toml:"prices"                 description:"per-model price table [<case>.prices.\"<model>\"] with input, cached, output in USD per 1M tokens; an entry replaces the built-in price" default-text:"built in for the default models"`

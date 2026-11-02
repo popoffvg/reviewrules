@@ -25,6 +25,8 @@ type FantasyForkAgent struct {
 	promptCacheKey string
 	// liteLLMSession sends litellm_session_id, which only a LiteLLM proxy accepts.
 	liteLLMSession bool
+	systemPrompt   string
+	lastStepAnswer string
 
 	mutex   sync.Mutex
 	agents  map[ForkSettings]fantasy.Agent
@@ -40,12 +42,18 @@ func NewFantasyForkAgent(
 	repoRoot string,
 	promptCacheKey string,
 	liteLLMSession bool,
+	text prompts.Set,
 ) *FantasyForkAgent {
+	if text.ReviewSystem == "" {
+		text = prompts.Default()
+	}
 	return &FantasyForkAgent{
 		provider:       provider,
 		repoRoot:       repoRoot,
 		promptCacheKey: promptCacheKey,
 		liteLLMSession: liteLLMSession,
+		systemPrompt:   text.ReviewSystem,
+		lastStepAnswer: text.LastStepAnswer,
 		agents:         map[ForkSettings]fantasy.Agent{},
 		forks:          map[string][]fantasy.Message{},
 	}
@@ -128,7 +136,7 @@ func (a *FantasyForkAgent) generateFork(
 		Messages:    history,
 		Prompt:      prompt,
 		StopWhen:    []fantasy.StopCondition{fantasy.StepCountIs(settings.MaxSteps)},
-		PrepareStep: answerOnLastStep(settings.MaxSteps),
+		PrepareStep: a.answerOnLastStep(settings.MaxSteps),
 	})
 	if err != nil {
 		return ForkReply{}, err
@@ -173,7 +181,7 @@ func (a *FantasyForkAgent) agentFor(ctx context.Context, settings ForkSettings) 
 	}
 	agent := fantasy.NewAgent(
 		model,
-		fantasy.WithSystemPrompt(prompts.ReviewSystem),
+		fantasy.WithSystemPrompt(a.systemPrompt),
 		fantasy.WithTools(NewRepoReadTools(a.repoRoot)...),
 		fantasy.WithProviderOptions(fantasy.ProviderOptions{openaicompat.Name: options}),
 	)
@@ -184,7 +192,7 @@ func (a *FantasyForkAgent) agentFor(ctx context.Context, settings ForkSettings) 
 // answerOnLastStep forbids tool calls on the last allowed step, so a fork that spent its
 // steps on reading still ends with a text answer. ToolChoiceNone keeps the tool list in
 // the request, so the cached prefix still matches.
-func answerOnLastStep(maxSteps int) fantasy.PrepareStepFunction {
+func (a *FantasyForkAgent) answerOnLastStep(maxSteps int) fantasy.PrepareStepFunction {
 	return func(
 		ctx context.Context,
 		options fantasy.PrepareStepFunctionOptions,
@@ -193,7 +201,7 @@ func answerOnLastStep(maxSteps int) fantasy.PrepareStepFunction {
 			return ctx, fantasy.PrepareStepResult{}, nil
 		}
 		none := fantasy.ToolChoiceNone
-		messages := append(slices.Clone(options.Messages), fantasy.NewUserMessage(prompts.LastStepAnswer))
+		messages := append(slices.Clone(options.Messages), fantasy.NewUserMessage(a.lastStepAnswer))
 		return ctx, fantasy.PrepareStepResult{ToolChoice: &none, Messages: messages}, nil
 	}
 }

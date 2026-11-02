@@ -34,6 +34,8 @@ type ReviewRunConfig struct {
 	RuleFolders []string
 	// RuleSets are the fetched rule sets, in the order of the rule_sets list.
 	RuleSets []ruleset.RuleSetCheckout
+	// Prompts is the text of this run. An empty set uses the built-in prompts.
+	Prompts prompts.Set
 }
 
 // RunReview loads the rules and the diff, runs the parent session once, then runs every
@@ -117,7 +119,11 @@ func RunReview(
 		"prompt_cache_key", cacheKey,
 		"reasoning_effort", cfg.ReasoningEffort,
 	)
-	parentUsage, err := agent.StartParentSession(ctx, prompts.ParentSession(prompts.ParentSessionInput{
+	text := cfg.Prompts
+	if text.ReviewSystem == "" {
+		text = prompts.Default()
+	}
+	parentUsage, err := agent.StartParentSession(ctx, text.ParentSession(prompts.ParentSessionInput{
 		Instructions:        catalog.Instructions,
 		RuleSetInstructions: ruleSetInstructions(catalog.RuleSetInstructions),
 		Docs:                docs,
@@ -139,7 +145,7 @@ func RunReview(
 		wait.Go(func() {
 			limit <- struct{}{}
 			defer func() { <-limit }()
-			check := CheckRuleInFork(ctx, agent, ruleSettings, rule)
+			check := CheckRuleInFork(ctx, agent, ruleSettings, rule, text)
 			logger.Info("review rule fork done", "rule", rule.ID, "verdict", check.Verdict, "usage", check.Usage.String())
 			report.Rules[index] = check
 		})
@@ -149,7 +155,7 @@ func RunReview(
 	if cfg.CorrectnessEnabled {
 		wait.Go(func() {
 			limit <- struct{}{}
-			hypotheses, usage, err := GenerateHypothesesInFork(ctx, agent, generatorSettings)
+			hypotheses, usage, err := GenerateHypothesesInFork(ctx, agent, generatorSettings, text)
 			<-limit
 			lock.Lock()
 			report.Correctness.GeneratorUsage = usage
@@ -165,7 +171,7 @@ func RunReview(
 				checkWait.Go(func() {
 					limit <- struct{}{}
 					defer func() { <-limit }()
-					checks[index] = CheckHypothesisInFork(ctx, agent, checkSettings, hypothesis)
+					checks[index] = CheckHypothesisInFork(ctx, agent, checkSettings, hypothesis, text)
 					logger.Info("review hypothesis fork done", "id", hypothesis.ID, "verdict", checks[index].Verdict)
 				})
 			}

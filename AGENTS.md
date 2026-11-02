@@ -14,7 +14,7 @@ reviewrules reviews a git diff against the rules in `.reviewrules/` and in the e
 | `internal/rulecatalog` | loads the rule folders that `rule_folders` names, the scoped docs, and splits a list rule into one check per item |
 | `internal/ruleset` | the `[[rule_sets]]` entries (`RuleSet`, `RuleSetList`), the git fetch and cache (`FetchRuleSets`); see docs/rule-sets.md |
 | `internal/review` | the run: diff, parent session, rule forks, hypothesis forks, report, cost; the `ReviewForkAgent` interface; the fantasy agent for the API backends |
-| `internal/prompts` | every prompt text, one embedded file per text (`go:embed`) |
+| `internal/prompts` | every prompt text, one embedded file per text (`go:embed`). `prompts.Load` reads `prompts_dir`: a file with a built-in name replaces that prompt, and any other name is an error |
 | `internal/agentplugin` | the agent plugin protocol (`PluginRequest`, `PluginReply`), the `AgentPlugin` interface, `PluginForkAgent`, and the exec adapter `ExecAgentPlugin` |
 | `internal/agentplugin/codexplugin` | the built-in `codex` plugin |
 | `internal/agentplugin/claudeplugin` | the built-in `claude` plugin |
