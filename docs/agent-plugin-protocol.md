@@ -74,7 +74,7 @@ One review is one run of reviewrules. It calls the plugin in this order:
 1. **`start-parent`, one time.** The prompt has the review instructions, the scoped docs, and the diff. reviewrules waits until this call ends before it starts any fork, so that every fork finds the parent history in the prompt cache of the backend. reviewrules keeps the `session_id` of the reply as the parent session.
 2. **`fork` for each rule check, in parallel.** Each rule check is a fork of the parent session. The fork prompt has the text of one rule.
 3. **`fork` for the hypothesis generator, in parallel with the rule forks.** This fork writes up to 10 yes/no questions about bugs in the diff. It runs only when the correctness check is on (the default; `correctness = false` in `.reviewrules/settings.toml` turns it off).
-4. **`fork` for each hypothesis checker, in parallel.** When the generator is done, reviewrules forks the parent session again for each question. A checker is a fork of the parent, not of the generator.
+4. **`fork` once for the hypothesis ledger.** When the generator is done, reviewrules forks the parent session once. The request field `hypotheses` is the whole ledger, and the prompt repeats those rows. A checker is a fork of the parent, not of the generator.
 5. **`append`, only when a fork reply has no JSON block.** Each fork MUST end with a JSON block. When the `text` of a fork reply has no usable JSON block, reviewrules sends one `append` to that fork. The prompt asks the model again for only the JSON block, and `max_steps` is `1`. reviewrules sends at most one `append` per fork.
 
 At most `parallel` operations (user config key `parallel`, default 8) run at the same time. Thus the plugin can run up to `parallel` processes at the same time, on the same parent session.
@@ -211,6 +211,7 @@ The request is one JSON object. Every field is in every request, except `session
 | `repo_root` | string | all | The absolute path of the repo under review. It is also the working directory of the process. |
 | `prompt_cache_key` | string | all | A key for the prompt cache: `reviewrules-` and 16 hex characters from a hash of the diff. It is the same in every request of a run. A backend that routes its cache by a key SHOULD send it. A plugin MAY also use it to name its session storage. |
 | `session_id` | string | `fork`, `append` | `fork`: the session to copy. `append`: the session to continue. Absent in `start-parent`. |
+| `hypotheses` | array | the one checker `fork` | The hypothesis ledger. Each item has `id`, `hunt`, `at`, `question`, and `look`. Absent on every other request. The prompt repeats the same rows, so a plugin that only sends `prompt` still shows the ledger to the model. |
 
 Example of a version check in bash:
 
@@ -259,7 +260,7 @@ The effect of a failed operation on the review:
 | `start-parent` | The review stops. reviewrules exits with code 2. |
 | `fork` or `append` of a rule check | The rule gets the verdict `ERROR` with the error text. This is a warning, not a failure, unless the repo settings set `fail_on_unanswered = true`. |
 | `fork` or `append` of the hypothesis generator | The report shows `hypothesis generator gave no answer`. This is a warning, unless the repo settings set `fail_on_unanswered = true`. |
-| `fork` or `append` of a hypothesis checker | The hypothesis gets the verdict `UNSURE` with the error text. A failed check is never a defect. |
+| `fork` or `append` of the hypothesis ledger | Every hypothesis gets the verdict `UNSURE` with the error text. A failed check is never a defect. |
 
 reviewrules does not run a failed operation again. When the error is temporary (for example a rate limit), the plugin MAY try again itself before it exits.
 
@@ -285,7 +286,7 @@ reviewrules adds the `usage` of each reply to one of three parts of the review. 
 |---|---|---|
 | `parent` | `start-parent` | `parent_usage` |
 | `rules` | the `fork` and the `append` of each rule check | `rules_usage`, and `usage` of each item in `rules` |
-| `correctness` | the `fork` and the `append` of the hypothesis generator and of each hypothesis checker | `correctness.generator_usage`, `correctness.check_usage`, `correctness.usage` |
+| `correctness` | the `fork` and the `append` of the hypothesis generator and of the hypothesis ledger | `correctness.generator_usage`, `correctness.check_usage`, `correctness.usage` |
 
 `total_usage` is the sum of the three parts. In the report, the reply fields have these names:
 

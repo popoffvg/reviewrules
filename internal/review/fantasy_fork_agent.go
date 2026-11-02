@@ -104,6 +104,16 @@ func (a *FantasyForkAgent) ForkParentSession(
 	return a.generateFork(ctx, "", history, prompt, settings)
 }
 
+// ForkHypothesisLedger runs one checker fork. The ledger is in prompt; fantasy has no protocol field.
+func (a *FantasyForkAgent) ForkHypothesisLedger(
+	ctx context.Context,
+	prompt string,
+	settings ForkSettings,
+	_ []Hypothesis,
+) (ForkReply, error) {
+	return a.ForkParentSession(ctx, prompt, settings)
+}
+
 // AppendToFork runs prompt after a finished fork's history and keeps the fork id.
 func (a *FantasyForkAgent) AppendToFork(
 	ctx context.Context,

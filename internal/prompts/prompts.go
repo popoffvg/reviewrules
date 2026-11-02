@@ -64,9 +64,15 @@ type RuleCheckInput struct {
 	Text     string
 }
 
-// HypothesisCheckInput is the one hypothesis a fork answers.
+// HypothesisCheckInput is the ledger one checker fork answers.
 type HypothesisCheckInput struct {
+	Hypotheses []HypothesisCheckItem
+}
+
+// HypothesisCheckItem is one row of the checker prompt, the same row as the protocol hypotheses field.
+type HypothesisCheckItem struct {
 	ID       string
+	Hunt     string
 	At       string
 	Question string
 	Look     string

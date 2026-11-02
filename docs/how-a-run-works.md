@@ -6,7 +6,7 @@ A run of reviewrules does these steps in this order:
 2. Diff `merge-base(--base, HEAD)` against `HEAD`, or against the working tree with `--worktree`. Paths in `ignorePatterns` are left out.
 3. Run the **parent session** once. Its first message holds the instructions, the scoped docs, and the diff. The parent maps the change and gives no verdict.
 4. After the parent session finishes, run every rule check as a **fork** of it. A fork is a new call that starts with the parent's full history, allowing the provider to reuse its prompt cache.
-5. Run one fork that writes at most 10 yes/no correctness hypotheses. Then answer each hypothesis in its own fork of the parent, not of the generator, so a checker does not inherit the generator's suspicion.
+5. Run one fork that writes at least one and at most 10 yes/no correctness hypotheses. An empty list is a generator error. Then one fork of the parent answers the whole ledger. That fork's request field `hypotheses` is the ledger. It is not a fork of the generator, so the checker does not inherit the generator's suspicion.
 6. Print the summary, write the JSON report when asked, and exit.
 
 Every agent can only read. The API backends get `read_file`, `grep` (git grep), and `list_dir`, all confined to the repo; `claude` gets `Read`, `Grep`, `Glob`; `codex` runs with `-s read-only`.

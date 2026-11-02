@@ -72,6 +72,9 @@ func GenerateHypothesesInFork(
 		return nil, usage, fmt.Errorf("hypothesis generator reply: %w", err)
 	}
 	hypotheses := reply.Hypotheses
+	if len(hypotheses) == 0 {
+		return nil, usage, fmt.Errorf("hypothesis generator reply: hypotheses list is empty")
+	}
 	if len(hypotheses) > maxHypotheses {
 		hypotheses = hypotheses[:maxHypotheses]
 	}
@@ -83,44 +86,86 @@ func GenerateHypothesesInFork(
 	return hypotheses, usage, nil
 }
 
-// CheckHypothesisInFork forks the parent session, not the generator, so the checker does not
-// inherit the generator's reasons for suspecting the code.
-func CheckHypothesisInFork(
+type hypothesisLedgerReply struct {
+	Verdicts []hypothesisLedgerVerdict `json:"verdicts"`
+}
+
+type hypothesisLedgerVerdict struct {
+	ID string `json:"id"`
+	hypothesisCheckReply
+}
+
+// CheckHypothesesInFork forks the parent once with the whole ledger. The fork is not the generator,
+// so the checker does not inherit the generator's reasons for suspecting the code.
+// The fork usage is stored on the first check; later checks carry none, so a sum counts the call once.
+func CheckHypothesesInFork(
 	ctx context.Context,
 	agent ReviewForkAgent,
 	settings ForkSettings,
-	hypothesis Hypothesis,
+	hypotheses []Hypothesis,
 	text prompts.Set,
-) HypothesisCheck {
-	check := HypothesisCheck{
-		Hypothesis: hypothesis,
-		Verdict:    HypothesisVerdictUnsure,
-		Evidence:   []string{},
+) []HypothesisCheck {
+	checks := make([]HypothesisCheck, len(hypotheses))
+	for index, hypothesis := range hypotheses {
+		checks[index] = HypothesisCheck{
+			Hypothesis: hypothesis,
+			Verdict:    HypothesisVerdictUnsure,
+			Evidence:   []string{},
+		}
 	}
-	prompt := text.HypothesisCheck(prompts.HypothesisCheckInput{
-		ID:       hypothesis.ID,
-		At:       hypothesis.At,
-		Question: hypothesis.Question,
-		Look:     hypothesis.Look,
-	})
-	fork, err := agent.ForkParentSession(ctx, prompt, settings)
+	if len(hypotheses) == 0 {
+		return checks
+	}
+	items := make([]prompts.HypothesisCheckItem, len(hypotheses))
+	for index, hypothesis := range hypotheses {
+		items[index] = prompts.HypothesisCheckItem{
+			ID:       hypothesis.ID,
+			Hunt:     hypothesis.Hunt,
+			At:       hypothesis.At,
+			Question: hypothesis.Question,
+			Look:     hypothesis.Look,
+		}
+	}
+	prompt := text.HypothesisCheck(prompts.HypothesisCheckInput{Hypotheses: items})
+	fork, err := agent.ForkHypothesisLedger(ctx, prompt, settings, hypotheses)
 	if err != nil {
-		check.Error = "hypothesis fork failed: " + err.Error()
-		return check
+		for index := range checks {
+			checks[index].Error = "hypothesis ledger fork failed: " + err.Error()
+		}
+		return checks
 	}
-	var reply hypothesisCheckReply
-	retryUsage, _, err := forkReplyJSON(ctx, agent, settings, fork, "verdict", &reply, text.JSONOnlyRetry)
-	check.Usage = AddUsage(fork.Usage, retryUsage)
+	var reply hypothesisLedgerReply
+	retryUsage, _, err := forkReplyJSON(ctx, agent, settings, fork, "verdicts", &reply, text.JSONOnlyRetry)
+	usage := AddUsage(fork.Usage, retryUsage)
+	checks[0].Usage = usage
 	if err != nil {
-		check.Error = err.Error()
-		return check
+		for index := range checks {
+			checks[index].Error = err.Error()
+		}
+		return checks
 	}
+	byID := map[string]hypothesisLedgerVerdict{}
+	for _, verdict := range reply.Verdicts {
+		byID[verdict.ID] = verdict
+	}
+	for index := range checks {
+		verdict, ok := byID[checks[index].ID]
+		if !ok {
+			checks[index].Error = "hypothesis ledger reply has no verdict for " + checks[index].ID
+			continue
+		}
+		applyHypothesisVerdict(&checks[index], verdict.hypothesisCheckReply)
+	}
+	return checks
+}
+
+func applyHypothesisVerdict(check *HypothesisCheck, reply hypothesisCheckReply) {
 	switch reply.Verdict {
 	case HypothesisVerdictConfirmed, HypothesisVerdictRefuted, HypothesisVerdictUnsure:
 		check.Verdict = reply.Verdict
 	default:
 		check.Error = "hypothesis fork verdict is not CONFIRMED, REFUTED, or UNSURE: " + string(reply.Verdict)
-		return check
+		return
 	}
 	if reply.Evidence != nil {
 		check.Evidence = reply.Evidence
@@ -134,5 +179,4 @@ func CheckHypothesisInFork(
 		check.Scenario = reply.Scenario
 		check.Edit = reply.Edit
 	}
-	return check
 }

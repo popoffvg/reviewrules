@@ -17,6 +17,9 @@ type ReviewForkAgent interface {
 	StartParentSession(ctx context.Context, prompt string, settings ForkSettings) (fantasy.Usage, error)
 	// ForkParentSession runs prompt as a new turn after the parent history; forks may run in parallel.
 	ForkParentSession(ctx context.Context, prompt string, settings ForkSettings) (ForkReply, error)
+	// ForkHypothesisLedger is the one checker fork. hypotheses is the protocol field of that request,
+	// and prompt repeats the same rows for a backend that only reads the prompt.
+	ForkHypothesisLedger(ctx context.Context, prompt string, settings ForkSettings, hypotheses []Hypothesis) (ForkReply, error)
 	// AppendToFork adds one turn to the end of a finished fork, for example to ask again for the JSON answer.
 	AppendToFork(ctx context.Context, forkID string, prompt string, settings ForkSettings) (ForkReply, error)
 }
