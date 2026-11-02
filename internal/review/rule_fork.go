@@ -60,6 +60,7 @@ func CheckRuleInFork(
 	agent ReviewForkAgent,
 	settings ForkSettings,
 	rule rulecatalog.ReviewRule,
+	text prompts.Set,
 ) RuleCheckResult {
 	check := RuleCheckResult{
 		RuleID:   rule.ID,
@@ -67,14 +68,14 @@ func CheckRuleInFork(
 		Verdict:  RuleVerdictError,
 		Findings: []RuleFinding{},
 	}
-	prompt := prompts.RuleCheck(prompts.RuleCheckInput{ID: rule.ID, Severity: rule.Severity.String(), Text: rule.Text})
+	prompt := text.RuleCheck(prompts.RuleCheckInput{ID: rule.ID, Severity: rule.Severity.String(), Text: rule.Text})
 	fork, err := agent.ForkParentSession(ctx, prompt, settings)
 	if err != nil {
 		check.Error = "rule fork failed: " + err.Error()
 		return check
 	}
 	var reply ruleForkReply
-	retryUsage, replyText, err := forkReplyJSON(ctx, agent, settings, fork, "verdict", &reply)
+	retryUsage, replyText, err := forkReplyJSON(ctx, agent, settings, fork, "verdict", &reply, text.JSONOnlyRetry)
 	check.Usage = AddUsage(fork.Usage, retryUsage)
 	if err != nil {
 		check.Error = err.Error()

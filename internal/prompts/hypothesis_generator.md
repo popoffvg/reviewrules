@@ -14,7 +14,8 @@ Walk these hunts over every hunk:
 
 Each place the code may be wrong becomes one yes/no question whose YES is a defect.
 At most 10. Prefer a silent wrong result over a loud failure. Merge two questions about one code path.
-Do not answer them; other agents will.
+Use only the diff already in the conversation. Do not open a file. Do not answer the questions; other agents will.
+Reply with one json block and nothing else.
 
 End with this JSON block (an empty list when nothing is suspect):
 ```json

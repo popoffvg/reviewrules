@@ -17,12 +17,16 @@ type PluginForkAgent struct {
 	plugin          AgentPlugin
 	repoRoot        string
 	promptCacheKey  string
+	systemPrompt    string
 	parentSessionID string
 }
 
-// NewPluginForkAgent builds the agent for one run.
-func NewPluginForkAgent(plugin AgentPlugin, repoRoot string, promptCacheKey string) *PluginForkAgent {
-	return &PluginForkAgent{plugin: plugin, repoRoot: repoRoot, promptCacheKey: promptCacheKey}
+// NewPluginForkAgent builds the agent for one run. An empty systemPrompt uses the built-in system prompt.
+func NewPluginForkAgent(plugin AgentPlugin, repoRoot string, promptCacheKey string, systemPrompt string) *PluginForkAgent {
+	if systemPrompt == "" {
+		systemPrompt = prompts.ReviewSystem
+	}
+	return &PluginForkAgent{plugin: plugin, repoRoot: repoRoot, promptCacheKey: promptCacheKey, systemPrompt: systemPrompt}
 }
 
 // StartParentSession runs start-parent.
@@ -65,7 +69,7 @@ func (a *PluginForkAgent) pluginRequest(prompt string, settings review.ForkSetti
 	return PluginRequest{
 		ProtocolVersion: PluginProtocolVersion,
 		Prompt:          prompt,
-		SystemPrompt:    prompts.ReviewSystem,
+		SystemPrompt:    a.systemPrompt,
 		Model:           settings.Model,
 		ReasoningEffort: settings.ReasoningEffort,
 		MaxSteps:        settings.MaxSteps,

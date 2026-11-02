@@ -3,6 +3,9 @@ package prompts
 
 import (
 	"embed"
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"text/template"
 )
@@ -69,19 +72,131 @@ type HypothesisCheckInput struct {
 	Look     string
 }
 
+// Set is the prompt text of one run. Default is the embedded text. Load replaces a file that prompts_dir holds.
+type Set struct {
+	ReviewSystem        string
+	HypothesisGenerator string
+	JSONOnlyRetry       string
+	LastStepAnswer      string
+	parent              *template.Template
+	rule                *template.Template
+	hypothesis          *template.Template
+}
+
+// Default is the embedded prompt text.
+func Default() Set {
+	return defaultSet
+}
+
+var defaultSet = Set{
+	ReviewSystem:        ReviewSystem,
+	HypothesisGenerator: HypothesisGenerator,
+	JSONOnlyRetry:       JSONOnlyRetry,
+	LastStepAnswer:      LastStepAnswer,
+	parent:              parentSessionTemplate,
+	rule:                ruleCheckTemplate,
+	hypothesis:          hypothesisCheckTemplate,
+}
+
+// Prompt file names a prompts_dir entry must use. A different name is an error.
+const (
+	FileReviewSystem        = "review_system.md"
+	FileHypothesisGenerator = "hypothesis_generator.md"
+	FileJSONOnlyRetry       = "json_only_retry.md"
+	FileLastStepAnswer      = "last_step_answer.md"
+	FileParentSession       = "parent_session.md.tmpl"
+	FileRuleCheck           = "rule_check.md.tmpl"
+	FileHypothesisCheck     = "hypothesis_check.md.tmpl"
+)
+
+// Load returns the embedded prompts when dir is empty. A file in dir whose name matches a built-in
+// prompt replaces that prompt. Any other file, an empty file, or a template that does not parse is an error.
+func Load(dir string) (Set, error) {
+	set := Default()
+	if dir == "" {
+		return set, nil
+	}
+	info, err := os.Stat(dir)
+	if err != nil {
+		return Set{}, fmt.Errorf("prompts_dir %q: %w", dir, err)
+	}
+	if !info.IsDir() {
+		return Set{}, fmt.Errorf("prompts_dir %q is not a directory", dir)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return Set{}, fmt.Errorf("prompts_dir %q: %w", dir, err)
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() {
+			return Set{}, fmt.Errorf("prompts_dir %q has directory %q; want a prompt file", dir, name)
+		}
+		raw, err := os.ReadFile(filepath.Join(dir, name)) //nolint:gosec // G304: dir is the operator's prompts_dir
+		if err != nil {
+			return Set{}, fmt.Errorf("prompts_dir %q read %s: %w", dir, name, err)
+		}
+		text := strings.TrimSuffix(string(raw), "\n")
+		if strings.TrimSpace(text) == "" {
+			return Set{}, fmt.Errorf("prompts_dir %q file %s is empty", dir, name)
+		}
+		switch name {
+		case FileReviewSystem:
+			set.ReviewSystem = text
+		case FileHypothesisGenerator:
+			set.HypothesisGenerator = text
+		case FileJSONOnlyRetry:
+			set.JSONOnlyRetry = text
+		case FileLastStepAnswer:
+			set.LastStepAnswer = text
+		case FileParentSession:
+			set.parent, err = parsePromptTemplate(name, text)
+		case FileRuleCheck:
+			set.rule, err = parsePromptTemplate(name, text)
+		case FileHypothesisCheck:
+			set.hypothesis, err = parsePromptTemplate(name, text)
+		default:
+			return Set{}, fmt.Errorf("prompts_dir %q has unknown prompt file %q", dir, name)
+		}
+		if err != nil {
+			return Set{}, fmt.Errorf("prompts_dir %q file %s: %w", dir, name, err)
+		}
+	}
+	return set, nil
+}
+
 // ParentSession puts the docs before the diff, so the stable part of the prefix comes first.
 func ParentSession(input ParentSessionInput) string {
-	return render(parentSessionTemplate, input)
+	return Default().ParentSession(input)
+}
+
+// ParentSession renders this set's parent prompt.
+func (s Set) ParentSession(input ParentSessionInput) string {
+	return render(s.parent, input)
 }
 
 // RuleCheck asks a fork to check the diff against one rule.
 func RuleCheck(input RuleCheckInput) string {
-	return render(ruleCheckTemplate, input)
+	return Default().RuleCheck(input)
+}
+
+// RuleCheck renders this set's rule prompt.
+func (s Set) RuleCheck(input RuleCheckInput) string {
+	return render(s.rule, input)
 }
 
 // HypothesisCheck asks a fork to answer one hypothesis with quoted evidence.
 func HypothesisCheck(input HypothesisCheckInput) string {
-	return render(hypothesisCheckTemplate, input)
+	return Default().HypothesisCheck(input)
+}
+
+// HypothesisCheck renders this set's hypothesis prompt.
+func (s Set) HypothesisCheck(input HypothesisCheckInput) string {
+	return render(s.hypothesis, input)
+}
+
+func parsePromptTemplate(name string, text string) (*template.Template, error) {
+	return template.New(name).Option("missingkey=error").Parse(text)
 }
 
 // promptText drops the final newline of the file: no prompt ends with one.
