@@ -165,17 +165,13 @@ func RunReview(
 			lock.Unlock()
 			logger.Info("review hypothesis generator done", "hypotheses", len(hypotheses), "usage", usage.String())
 
-			checks := make([]HypothesisCheck, len(hypotheses))
-			var checkWait sync.WaitGroup
-			for index, hypothesis := range hypotheses {
-				checkWait.Go(func() {
-					limit <- struct{}{}
-					defer func() { <-limit }()
-					checks[index] = CheckHypothesisInFork(ctx, agent, checkSettings, hypothesis, text)
-					logger.Info("review hypothesis fork done", "id", hypothesis.ID, "verdict", checks[index].Verdict)
-				})
+			var checks []HypothesisCheck
+			if err == nil {
+				limit <- struct{}{}
+				checks = CheckHypothesesInFork(ctx, agent, checkSettings, hypotheses, text)
+				<-limit
+				logger.Info("review hypothesis ledger done", "hypotheses", len(checks))
 			}
-			checkWait.Wait()
 			lock.Lock()
 			report.Correctness.HypothesisCheck = checks
 			lock.Unlock()

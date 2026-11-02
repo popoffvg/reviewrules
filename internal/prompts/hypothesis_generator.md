@@ -12,12 +12,14 @@ Walk these hunts over every hunk:
 | Concurrency | a new shared value read or written from two goroutines with no guard |
 | Callers | a changed signature, return value, or meaning whose callers were not updated |
 
+Walk every hunt before you answer. Look for an input that makes the changed code give a wrong result.
+Do not stop because nothing looks suspect, and do not return an empty list.
 Each place the code may be wrong becomes one yes/no question whose YES is a defect.
 At most 10. Prefer a silent wrong result over a loud failure. Merge two questions about one code path.
 Use only the diff already in the conversation. Do not open a file. Do not answer the questions; other agents will.
 Reply with one json block and nothing else.
 
-End with this JSON block (an empty list when nothing is suspect):
+End with this JSON block:
 ```json
 {"hypotheses": [{"id": "H1", "hunt": "Boundaries", "at": "file:line", "question": "yes/no question, yes = defect", "look": "files, symbols, callers that hold the answer"}]}
 ```

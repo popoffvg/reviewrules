@@ -46,10 +46,47 @@ func (a *PluginForkAgent) ForkParentSession(
 	prompt string,
 	settings review.ForkSettings,
 ) (review.ForkReply, error) {
+	return a.fork(ctx, prompt, settings, nil)
+}
+
+// ForkHypothesisLedger runs one fork whose request hypotheses field is the ledger.
+func (a *PluginForkAgent) ForkHypothesisLedger(
+	ctx context.Context,
+	prompt string,
+	settings review.ForkSettings,
+	hypotheses []review.Hypothesis,
+) (review.ForkReply, error) {
+	return a.fork(ctx, prompt, settings, hypotheses)
+}
+
+func (a *PluginForkAgent) fork(
+	ctx context.Context,
+	prompt string,
+	settings review.ForkSettings,
+	hypotheses []review.Hypothesis,
+) (review.ForkReply, error) {
 	request := a.pluginRequest(prompt, settings)
 	request.SessionID = a.parentSessionID
+	request.Hypotheses = hypothesisLedger(hypotheses)
 	reply, err := a.plugin.RunOperation(ctx, OperationFork, request)
 	return reply.forkReply(), err
+}
+
+func hypothesisLedger(hypotheses []review.Hypothesis) []HypothesisLedgerItem {
+	if len(hypotheses) == 0 {
+		return nil
+	}
+	rows := make([]HypothesisLedgerItem, len(hypotheses))
+	for index, hypothesis := range hypotheses {
+		rows[index] = HypothesisLedgerItem{
+			ID:       hypothesis.ID,
+			Hunt:     hypothesis.Hunt,
+			At:       hypothesis.At,
+			Question: hypothesis.Question,
+			Look:     hypothesis.Look,
+		}
+	}
+	return rows
 }
 
 // AppendToFork runs append with the fork id.

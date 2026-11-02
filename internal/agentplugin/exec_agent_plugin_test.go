@@ -1,6 +1,7 @@
 package agentplugin
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -80,4 +81,43 @@ func TestFindExecAgentPluginRejects(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestForkHypothesisLedgerSetsTheProtocolField(t *testing.T) {
+	plugin := &capturePlugin{}
+	agent := NewPluginForkAgent(plugin, t.TempDir(), "cache-key", "system")
+	if _, err := agent.StartParentSession(t.Context(), "parent", review.ForkSettings{}); err != nil {
+		t.Fatal(err)
+	}
+	_, err := agent.ForkHypothesisLedger(t.Context(), "answer the ledger", review.ForkSettings{Model: "composer-2.5"}, []review.Hypothesis{
+		{ID: "H1", Hunt: "Boundaries", At: "a.go:1", Question: "Does the last second overflow?", Look: "snapid.go"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plugin.request.Hypotheses) != 1 || plugin.request.Hypotheses[0].ID != "H1" || plugin.request.Hypotheses[0].At != "a.go:1" {
+		t.Fatalf("prompt %q hypotheses = %+v; want H1", plugin.request.Prompt, plugin.request.Hypotheses)
+	}
+	if _, err := agent.ForkParentSession(t.Context(), "one rule", review.ForkSettings{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(plugin.request.Hypotheses) != 0 {
+		t.Fatalf("rule fork hypotheses = %+v; want none", plugin.request.Hypotheses)
+	}
+}
+
+type capturePlugin struct {
+	request PluginRequest
+}
+
+func (p *capturePlugin) RunOperation(_ context.Context, operation PluginOperation, request PluginRequest) (PluginReply, error) {
+	p.request = request
+	sessionID := request.SessionID
+	if operation == OperationStartParent {
+		sessionID = "parent"
+	}
+	if operation == OperationFork {
+		sessionID = "fork-1"
+	}
+	return PluginReply{SessionID: sessionID, Text: "ok"}, nil
 }
