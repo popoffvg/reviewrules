@@ -5,6 +5,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -77,7 +79,7 @@ func TestAnthropicCallsMarkTheLastMessageForTheCache(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	runParentAndFork(t, NewFantasyForkAgent(provider, t.TempDir(), AnthropicCallOptions(), prompts.Default()))
+	runParentAndFork(t, NewFantasyForkAgent(provider, t.TempDir(), AnthropicCallOptions(), prompts.Default(), ""))
 
 	requests := bodies()
 	if len(requests) != 2 {
@@ -103,13 +105,46 @@ func TestAnthropicCallsMarkTheLastMessageForTheCache(t *testing.T) {
 	}
 }
 
+func TestSessionDirGetsTheParentAndEachForkAfterTheParent(t *testing.T) {
+	server, _ := recordedRequests(t, anthropicReply)
+	provider, err := anthropic.New(anthropic.WithBaseURL(server.URL), anthropic.WithAPIKey("test"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sessionDir := t.TempDir()
+	runParentAndFork(t, NewFantasyForkAgent(provider, t.TempDir(), AnthropicCallOptions(), prompts.Default(), sessionDir))
+
+	parent := readSession(t, filepath.Join(sessionDir, "parent.json"))
+	fork := readSession(t, filepath.Join(sessionDir, "fork-1.json"))
+	if len(parent) != 3 || parent[0].Role != fantasy.MessageRoleSystem || parent[1].Role != fantasy.MessageRoleUser {
+		t.Errorf("parent.json: %d messages, want system, user, assistant: %+v", len(parent), parent)
+	}
+	if len(fork) != 2 || fork[0].Role != fantasy.MessageRoleUser || fork[1].Role != fantasy.MessageRoleAssistant {
+		t.Errorf("fork-1.json: %d messages, want the fork prompt and the answer only: %+v", len(fork), fork)
+	}
+}
+
+func readSession(t *testing.T, path string) []fantasy.Message {
+	t.Helper()
+	encoded, err := os.ReadFile(path) //nolint:gosec // G304: the path is in the test's temp folder
+	if err != nil {
+		t.Fatal(err)
+	}
+	var messages []fantasy.Message
+	err = json.Unmarshal(encoded, &messages)
+	if err != nil {
+		t.Fatalf("%s: %v", path, err)
+	}
+	return messages
+}
+
 func TestOpenAICompatCallsSendTheCacheKeyAndNoCacheMark(t *testing.T) {
 	server, bodies := recordedRequests(t, openAIReply)
 	provider, err := openaicompat.New(openaicompat.WithBaseURL(server.URL), openaicompat.WithAPIKey("test"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	runParentAndFork(t, NewFantasyForkAgent(provider, t.TempDir(), OpenAICompatCallOptions("key-1", false), prompts.Default()))
+	runParentAndFork(t, NewFantasyForkAgent(provider, t.TempDir(), OpenAICompatCallOptions("key-1", false), prompts.Default(), ""))
 
 	for index, body := range bodies() {
 		text := string(body)

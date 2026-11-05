@@ -17,6 +17,7 @@ type ReviewFlags struct {
 	Base        string `long:"base"         description:"base ref; the diff starts at merge-base(base, HEAD)"`
 	Worktree    bool   `long:"worktree"     description:"review uncommitted changes too (local run before a push)"`
 	JSONOut     string `long:"json-out"     description:"write the JSON report to this file, or to stdout with \"-\"; with CI=true and no flag it goes to stdout" default-mask:"none"`
+	SessionDir  string `long:"session-dir"  description:"save the messages of the parent session and of each fork as JSON files in this folder; API backends only" default-mask:"none"`
 	PrintConfig bool   `long:"print-config" description:"print every merged config value and the file that gave it, then exit without a review"`
 }
 

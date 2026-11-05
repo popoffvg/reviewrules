@@ -111,6 +111,7 @@ Every other setting lives in a config file. This table is generated from the CLI
 | `--base` | `origin/main` | base ref; the diff starts at merge-base(base, HEAD) |
 | `--worktree` | `false` | review uncommitted changes too (local run before a push) |
 | `--json-out` | `none` | write the JSON report to this file, or to stdout with "-"; with CI=true and no flag it goes to stdout |
+| `--session-dir` | `none` | save the messages of the parent session and of each fork as JSON files in this folder; API backends only |
 | `--print-config` | `false` | print every merged config value and the file that gave it, then exit without a review |
 <!-- flags:end -->
 

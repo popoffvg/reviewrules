@@ -4,7 +4,10 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"sync"
@@ -23,6 +26,7 @@ type FantasyForkAgent struct {
 	callOptions    FantasyCallOptions
 	systemPrompt   string
 	lastStepAnswer string
+	sessionDir     string
 
 	mutex   sync.Mutex
 	agents  map[ForkSettings]fantasy.Agent
@@ -31,11 +35,13 @@ type FantasyForkAgent struct {
 }
 
 // NewFantasyForkAgent builds the agent. callOptions gives the provider options of every call of the run.
+// A non-empty sessionDir gets parent.json and one fork-<id>.json per fork with their messages.
 func NewFantasyForkAgent(
 	provider fantasy.Provider,
 	repoRoot string,
 	callOptions FantasyCallOptions,
 	text prompts.Set,
+	sessionDir string,
 ) *FantasyForkAgent {
 	if text.ReviewSystem == "" {
 		text = prompts.Default()
@@ -46,6 +52,7 @@ func NewFantasyForkAgent(
 		callOptions:    callOptions,
 		systemPrompt:   text.ReviewSystem,
 		lastStepAnswer: text.LastStepAnswer,
+		sessionDir:     sessionDir,
 		agents:         map[ForkSettings]fantasy.Agent{},
 		forks:          map[string][]fantasy.Message{},
 	}
@@ -82,6 +89,10 @@ func (a *FantasyForkAgent) StartParentSession(
 	a.mutex.Lock()
 	a.history = history
 	a.mutex.Unlock()
+	err = a.saveSession("parent", append([]fantasy.Message{fantasy.NewSystemMessage(a.systemPrompt)}, history...))
+	if err != nil {
+		return ForkReply{}, err
+	}
 	return ForkReply{Usage: result.TotalUsage, Requests: stepUsages(result.Steps)}, nil
 }
 
@@ -162,7 +173,12 @@ func (a *FantasyForkAgent) generateFork(
 		forkID = strconv.Itoa(len(a.forks) + 1)
 	}
 	a.forks[forkID] = forkHistory
+	parentLength := len(a.history)
 	a.mutex.Unlock()
+	err = a.saveSession("fork-"+forkID, forkHistory[parentLength:])
+	if err != nil {
+		return ForkReply{}, err
+	}
 	return ForkReply{
 		ForkID:   forkID,
 		Text:     result.Response.Content.Text(),
@@ -216,4 +232,21 @@ func (a *FantasyForkAgent) answerOnLastStep(maxSteps int) fantasy.PrepareStepFun
 		messages := append(slices.Clone(options.Messages), fantasy.NewUserMessage(a.lastStepAnswer))
 		return ctx, fantasy.PrepareStepResult{ToolChoice: &none, Messages: withCacheBreakpoint(messages)}, nil
 	}
+}
+
+// saveSession writes messages to <name>.json in the session folder. A fork file holds only the
+// messages after the parent session, which parent.json holds.
+func (a *FantasyForkAgent) saveSession(name string, messages []fantasy.Message) error {
+	if a.sessionDir == "" {
+		return nil
+	}
+	encoded, err := json.MarshalIndent(messages, "", "  ")
+	if err != nil {
+		return fmt.Errorf("session %s encode failed: %w", name, err)
+	}
+	err = os.WriteFile(filepath.Join(a.sessionDir, name+".json"), append(encoded, '\n'), 0o600)
+	if err != nil {
+		return fmt.Errorf("session %s write failed: %w", name, err)
+	}
+	return nil
 }
