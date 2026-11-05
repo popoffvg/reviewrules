@@ -36,7 +36,7 @@ reviewrules has five flags and `--print-config` (see the Flags table in `README.
 | `prompts_dir` | `~/.config/reviewrules/config.toml` | `built-in prompts` | folder of prompt files that replace the built-in agent prompts; a file keeps its built-in name; empty uses the built-in prompts |
 | `claude_binary` | `~/.config/reviewrules/config.toml` | `"claude"` | claude binary for the claude agent |
 | `codex_binary` | `~/.config/reviewrules/config.toml` | `"codex"` | codex binary for the codex agent |
-| `prices` | `~/.config/reviewrules/config.toml` | `built in for the default models` | per-model price table [&lt;case&gt;.prices."&lt;model&gt;"] with input, cached, output in USD per 1M tokens; an entry replaces the built-in price |
+| `prices` | `~/.config/reviewrules/config.toml` | `built in for the default models` | per-model price table [&lt;case&gt;.prices."&lt;model&gt;"] with input, cached, cache_write, output in USD per 1M tokens, and optional long_prompt_tokens with a long_prompt table for larger requests; an entry replaces the built-in price |
 <!-- config:end -->
 
 ## Repo settings

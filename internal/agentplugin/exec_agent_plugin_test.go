@@ -19,7 +19,8 @@ func TestExecAgentPluginRunsEveryOperation(t *testing.T) {
 	agent := NewPluginForkAgent(plugin, t.TempDir(), "cache-key", "")
 	settings := review.ForkSettings{Model: "small", MaxSteps: 2}
 
-	usage, err := agent.StartParentSession(t.Context(), "parent prompt", settings)
+	parent, err := agent.StartParentSession(t.Context(), "parent prompt", settings)
+	usage := parent.Usage
 	if err != nil {
 		t.Fatal(err)
 	}

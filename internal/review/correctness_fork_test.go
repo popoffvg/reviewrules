@@ -5,8 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"charm.land/fantasy"
-
 	"github.com/popoffvg/reviewrules/internal/prompts"
 )
 
@@ -80,8 +78,8 @@ type scriptForkAgent struct {
 	text string
 }
 
-func (a scriptForkAgent) StartParentSession(context.Context, string, ForkSettings) (fantasy.Usage, error) {
-	return fantasy.Usage{}, nil
+func (a scriptForkAgent) StartParentSession(context.Context, string, ForkSettings) (ForkReply, error) {
+	return ForkReply{}, nil
 }
 
 func (a scriptForkAgent) ForkParentSession(context.Context, string, ForkSettings) (ForkReply, error) {

@@ -41,6 +41,7 @@ type HypothesisCheck struct {
 	Edit     string            `json:"edit,omitempty"`
 	Error    string            `json:"error,omitempty"`
 	Usage    fantasy.Usage     `json:"usage"`
+	Requests []fantasy.Usage   `json:"requests,omitempty"`
 }
 
 type hypothesisListReply struct {
@@ -60,20 +61,19 @@ func GenerateHypothesesInFork(
 	agent ReviewForkAgent,
 	settings ForkSettings,
 	text prompts.Set,
-) ([]Hypothesis, fantasy.Usage, error) {
+) ([]Hypothesis, ForkReply, error) {
 	fork, err := agent.ForkParentSession(ctx, text.HypothesisGenerator, settings)
 	if err != nil {
-		return nil, fantasy.Usage{}, fmt.Errorf("hypothesis generator fork failed: %w", err)
+		return nil, ForkReply{}, fmt.Errorf("hypothesis generator fork failed: %w", err)
 	}
 	var reply hypothesisListReply
-	retryUsage, _, err := forkReplyJSON(ctx, agent, settings, fork, "hypotheses", &reply, text.JSONOnlyRetry)
-	usage := AddUsage(fork.Usage, retryUsage)
+	spent, _, err := forkReplyJSON(ctx, agent, settings, fork, "hypotheses", &reply, text.JSONOnlyRetry)
 	if err != nil {
-		return nil, usage, fmt.Errorf("hypothesis generator reply: %w", err)
+		return nil, spent, fmt.Errorf("hypothesis generator reply: %w", err)
 	}
 	hypotheses := reply.Hypotheses
 	if len(hypotheses) == 0 {
-		return nil, usage, fmt.Errorf("hypothesis generator reply: hypotheses list is empty")
+		return nil, spent, fmt.Errorf("hypothesis generator reply: hypotheses list is empty")
 	}
 	if len(hypotheses) > maxHypotheses {
 		hypotheses = hypotheses[:maxHypotheses]
@@ -83,7 +83,7 @@ func GenerateHypothesesInFork(
 			hypotheses[index].ID = fmt.Sprintf("H%d", index+1)
 		}
 	}
-	return hypotheses, usage, nil
+	return hypotheses, spent, nil
 }
 
 type hypothesisLedgerReply struct {
@@ -135,9 +135,8 @@ func CheckHypothesesInFork(
 		return checks
 	}
 	var reply hypothesisLedgerReply
-	retryUsage, _, err := forkReplyJSON(ctx, agent, settings, fork, "verdicts", &reply, text.JSONOnlyRetry)
-	usage := AddUsage(fork.Usage, retryUsage)
-	checks[0].Usage = usage
+	spent, _, err := forkReplyJSON(ctx, agent, settings, fork, "verdicts", &reply, text.JSONOnlyRetry)
+	checks[0].Usage, checks[0].Requests = spent.Usage, spent.Requests
 	if err != nil {
 		for index := range checks {
 			checks[index].Error = err.Error()

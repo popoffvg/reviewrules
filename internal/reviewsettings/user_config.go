@@ -59,7 +59,7 @@ type UserConfig struct {
 	PromptsDir           string                            `toml:"prompts_dir"            description:"folder of prompt files that replace the built-in agent prompts; a file keeps its built-in name; empty uses the built-in prompts" default-text:"built-in prompts"`
 	ClaudeBinary         string                            `toml:"claude_binary"          description:"claude binary for the claude agent"`
 	CodexBinary          string                            `toml:"codex_binary"           description:"codex binary for the codex agent"`
-	Prices               map[string]review.ModelTokenPrice `toml:"prices"                 description:"per-model price table [<case>.prices.\"<model>\"] with input, cached, output in USD per 1M tokens; an entry replaces the built-in price" default-text:"built in for the default models"`
+	Prices               map[string]review.ModelTokenPrice `toml:"prices"                 description:"per-model price table [<case>.prices.\"<model>\"] with input, cached, cache_write, output in USD per 1M tokens, and optional long_prompt_tokens with a long_prompt table for larger requests; an entry replaces the built-in price" default-text:"built in for the default models"`
 }
 
 type userConfigFile struct {

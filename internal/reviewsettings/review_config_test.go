@@ -180,7 +180,7 @@ func TestWriteMergedConfigNamesEachSource(t *testing.T) {
 			t.Errorf("line for %s = %q; want it to end with %q", name, lines[name], want)
 		}
 	}
-	if !strings.Contains(lines["prices.gpt-6-luna"], "{input = 1.0, cached = 0.5, output = 2.0}") {
+	if !strings.Contains(lines["prices.gpt-6-luna"], "{input = 1.0, cached = 0.5, cache_write = 0.0, output = 2.0}") {
 		t.Errorf("price line = %q; want the inline table", lines["prices.gpt-6-luna"])
 	}
 	if len(lines) != len(ConfigKeys())-1+len(config.User.Prices) {

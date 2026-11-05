@@ -301,10 +301,10 @@ reviewrules adds the `usage` of each reply to one of three parts of the review. 
 The cost estimate (`cost_estimate` in the report) uses the price of the model name in the settings: `model` for `parent` and `rules`, `hypothesis_model` for the generator, and `hypothesis_check_model` (or `model`) for the checkers. It is:
 
 ```
-input_tokens × input price + cached_input_tokens × cached price + output_tokens × output price
+input_tokens × input price + cached_input_tokens × cached price + cache_write_tokens × cache_write price + output_tokens × output price
 ```
 
-The prices are per 1M tokens. The estimate does not price `cache_write_tokens`, and it does not add `reasoning_tokens` to `output_tokens`. Thus `output_tokens` MUST include the reasoning tokens. A model with no known price adds nothing to the total, and the summary asks the operator to add a `prices."<model>"` table with `input`, `cached`, and `output` to the user config.
+The prices are per 1M tokens. The estimate does not add `reasoning_tokens` to `output_tokens`. Thus `output_tokens` MUST include the reasoning tokens. A price with `long_prompt_tokens` and a `long_prompt` table prices each model request whose input is larger than `long_prompt_tokens` at the `long_prompt` prices. A plugin reports one usage per operation, so the estimate prices it at the base prices. A model with no known price adds nothing to the total, and the summary asks the operator to add a `prices."<model>"` table with `input`, `cached`, `cache_write`, and `output` to the user config.
 
 When an operation fails (a non-zero exit, a reply that is not JSON), reviewrules counts zero tokens for it.
 
