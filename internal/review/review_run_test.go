@@ -9,6 +9,33 @@ import (
 	"github.com/popoffvg/reviewrules/internal/rulecatalog"
 )
 
+func TestReviewModelsSwitchAtLargeDiffBytes(t *testing.T) {
+	cases := []struct {
+		name                     string
+		cfg                      ReviewRunConfig
+		diffBytes                int
+		model, hypothesis, check string
+	}{
+		{"small-diff-keeps-model", ReviewRunConfig{ModelName: "haiku", LargeDiffModel: "sonnet", LargeDiffBytes: 100},
+			99, "haiku", "haiku", "haiku"},
+		{"diff-at-the-limit-uses-the-large-model", ReviewRunConfig{ModelName: "haiku", LargeDiffModel: "sonnet", LargeDiffBytes: 100},
+			100, "sonnet", "sonnet", "sonnet"},
+		{"set-hypothesis-models-stay", ReviewRunConfig{
+			ModelName: "haiku", LargeDiffModel: "sonnet", LargeDiffBytes: 100, HypothesisModelName: "opus", HypothesisCheckModelName: "opus",
+		}, 100, "sonnet", "opus", "opus"},
+		{"no-large-model-keeps-model", ReviewRunConfig{ModelName: "haiku", LargeDiffBytes: 100},
+			1_000, "haiku", "haiku", "haiku"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			model, hypothesis, check := tc.cfg.reviewModels(tc.diffBytes)
+			if model != tc.model || hypothesis != tc.hypothesis || check != tc.check {
+				t.Errorf("reviewModels = %s, %s, %s; want %s, %s, %s", model, hypothesis, check, tc.model, tc.hypothesis, tc.check)
+			}
+		})
+	}
+}
+
 func TestLoadScopedContextDocsReadsRuleSetCheckout(t *testing.T) {
 	repo := t.TempDir()
 	checkout := t.TempDir()
