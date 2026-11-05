@@ -46,19 +46,30 @@ model = "openai/gpt-6-luna"
 hypothesis_model = "openai/gpt-6.1-sol"
 ```
 
-For the Anthropic API, run small diffs on Haiku and large diffs on Sonnet, and write the hypotheses with Opus on every diff. Leave `hypothesis_check_model` empty, so the checker runs on the parent's model and reads the parent's prompt cache:
+For the Anthropic API, [profiles](configuration.md#profiles) run small diffs on Haiku and large diffs on Sonnet, and write the hypotheses with Opus on every diff. With no `hypothesis_check` profile and an empty `hypothesis_check_model`, the checker runs on the rules model and reads the parent's prompt cache:
 
 ```toml
 [local]
 agent = "anthropic"
 model = "claude-haiku-5-5"
-large_diff_model = "claude-sonnet-5-5"
-large_diff_bytes = 65536
-hypothesis_model = "claude-opus-5-5"
+reasoning_effort = "medium"
+
+[[local.profiles]]
+if = "diff_bytes >= 65536"
+action = "rules"
+model = "claude-sonnet-5-5"
+
+[[local.profiles]]
+action = "rules"
+model = "claude-haiku-5-5"
+
+[[local.profiles]]
+action = "hypothesis"
+model = "claude-opus-5-5"
 reasoning_effort = "medium"
 ```
 
-The 64 KiB default comes from three PRs of one Go repository: Haiku gave precise findings on 5 KB and 19 KB diffs, and lost the line numbers of 15 of 37 findings on a 172 KB diff, where Sonnet kept all 16 of its own. A cache belongs to one model, so the Opus generator writes the parent's history to the cache once more; on the 172 KB diff that write cost about $0.49.
+The 64 KiB limit comes from three PRs of one Go repository: Haiku gave precise findings on 5 KB and 19 KB diffs, and lost the line numbers of 15 of 37 findings on a 172 KB diff, where Sonnet kept all 16 of its own. A cache belongs to one model, so the Opus generator writes the parent's history to the cache once more; on the 172 KB diff that write cost about $0.49. On the 5 KB and 19 KB diffs, a Sonnet generator confirmed as many hypotheses as Opus at half the cost or less; on the 172 KB diff Opus confirmed 5 and Sonnet 1.
 
 These are example configurations. Model availability depends on your account and provider. Local CLI backends use their own authentication; subscription runs consume the plan allowance. Review costs shown by reviewrules are token-based estimates.
 

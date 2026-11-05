@@ -25,8 +25,7 @@ reviewrules has five flags and `--print-config` (see the Flags table in `README.
 | `agent` | `~/.config/reviewrules/config.toml` | `"fantasy"` | backend: fantasy (LiteLLM endpoint), openai, openrouter, or anthropic (direct API), claude or codex (built-in plugins), or an exec plugin name |
 | `base_url` | `~/.config/reviewrules/config.toml` | `"http://localhost:4000/v1"` | endpoint for fantasy; for openai, openrouter, and anthropic only when it differs from the default LiteLLM URL |
 | `model` | `~/.config/reviewrules/config.toml` | `"gpt-6-luna"` | model for the parent session, the rule forks, and the hypothesis checkers |
-| `large_diff_model` | `~/.config/reviewrules/config.toml` | `""` | model that replaces model when the diff has at least large_diff_bytes bytes; an empty hypothesis_model or hypothesis_check_model follows it; empty keeps model |
-| `large_diff_bytes` | `~/.config/reviewrules/config.toml` | `65536` | diff size in bytes from which large_diff_model replaces model |
+| `profiles` | `~/.config/reviewrules/config.toml` | `none` | ordered [[&lt;case&gt;.profiles]] with if (an expr-lang expression over diff_bytes and changed_files; empty matches every diff), action (rules, hypothesis, or hypothesis_check), model, and optional reasoning_effort; for each action the first profile from the top whose if holds picks its model |
 | `hypothesis_model` | `~/.config/reviewrules/config.toml` | `"gpt-6.1-sol"` | model that writes the correctness hypotheses |
 | `hypothesis_check_model` | `~/.config/reviewrules/config.toml` | `model` | model that answers each hypothesis; empty uses model |
 | `reasoning_effort` | `~/.config/reviewrules/config.toml` | `"medium"` | effort for the parent session and the hypothesis forks |
@@ -136,15 +135,30 @@ The `.tmpl` files are Go templates with the same fields as the built-in files. A
 
 The user config has two cases with the same keys. reviewrules uses `[ci]` when the environment variable `CI` is `true`, else `[local]`. A key missing from the used case keeps its default: the cases do not inherit from each other. A key outside the two cases is an error.
 
+### Profiles
+
+A profile picks the model of one action when its condition holds for the diff. Profiles sit in a case as `[[<case>.profiles]]` tables:
+
+| Key | Meaning |
+|---|---|
+| `if` | an [expr-lang](https://expr-lang.org) expression over `diff_bytes` and `changed_files`, for example `diff_bytes >= 65536 && changed_files > 10`; empty matches every diff |
+| `action` | `rules` (the parent session and the rule forks), `hypothesis` (the generator), or `hypothesis_check` (the checker) |
+| `model` | the model of that action |
+| `reasoning_effort` | optional; replaces `rule_reasoning_effort` for `rules`, and `reasoning_effort` for the hypothesis forks |
+
+For each action, reviewrules checks the profiles from the top to the bottom, and the first profile whose `if` holds wins. An action with no matching profile keeps the case keys: `model`, `hypothesis_model`, and `hypothesis_check_model`. An empty hypothesis model follows the rules model, so its fork reads the parent's prompt cache. An unknown action, an empty model, or an `if` that is not a condition stops the run when the config loads. `--print-config` lists the profiles by position: `profiles.1`, `profiles.2`.
+
 ### Prices
 
-The cost estimate uses built-in prices for the default models. A `[<case>.prices."<model>"]` table replaces the built-in price of that model, or adds a price for a model with no built-in price. It has three keys, each in USD per 1M tokens:
+The cost estimate uses built-in prices for the default models. A `[<case>.prices."<model>"]` table replaces the built-in price of that model, or adds a price for a model with no built-in price. The prices are in USD per 1M tokens:
 
 | Key | Meaning |
 |---|---|
 | `input` | input tokens that the prompt cache did not serve |
 | `cached` | input tokens that the prompt cache served |
+| `cache_write` | input tokens written to the prompt cache; 0 where the provider does not charge for it |
 | `output` | output tokens, reasoning tokens included |
+| `long_prompt_tokens` and `long_prompt` | optional: a request whose input is larger than `long_prompt_tokens` is priced at the `long_prompt` table, with the same keys |
 
 A model with no price adds nothing to the total, and the summary names it.
 
