@@ -1,13 +1,38 @@
 # Configuration
 
-reviewrules has six flags and `--print-config` (see the Flags table in `README.md`). Every other choice is a key in one of two TOML files. Each key has one owner file.
+reviewrules has six flags and `--print-config` (see the Flags table in `README.md`). Every other choice is a key in a TOML file. A repo settings key can also be set in the global settings.
 
 | File | Who writes it | What it holds |
 |---|---|---|
+| `settings.toml` next to the user config, for example `~/.config/reviewrules/settings.toml` (the global settings) | each operator, or the CI job | the same keys as the repo settings, for every repo on that machine |
 | `.reviewrules/settings.toml` at the repo root (the repo settings) | the team; commit it | the review policy: the rule folders, the rule sets, what fails the run, the correctness check, the diff size limit |
 | `~/.config/reviewrules/config.toml`, or the file that `--config` names (the user config) | each operator, or the CI job | the machine choices: the backend, the models, the effort, the parallel forks, the binaries, the prices |
 
-`$XDG_CONFIG_HOME/reviewrules/config.toml` replaces the default user config path when `XDG_CONFIG_HOME` is set. Both files are optional. A missing file or a missing key keeps the default.
+`$XDG_CONFIG_HOME/reviewrules/config.toml` replaces the default user config path when `XDG_CONFIG_HOME` is set. Every file is optional. A missing file or a missing key keeps the default.
+
+## Global settings
+
+The global settings file holds repo settings keys for every repo that you review on one machine. reviewrules reads `settings.toml` in the folder of the user config: `~/.config/reviewrules/settings.toml`, or next to the file that `--config` names. Each value comes from the first file in this list that sets its key:
+
+1. `.reviewrules/settings.toml` of the repo
+2. the global settings
+3. the default
+
+A key replaces the whole value, a list too. A repo that sets `rule_sets` uses only its own list. To keep a global rule set, list it in the repo file again. `--print-config` shows the file that gave each value.
+
+For example, give every repo the block rule set and fail only on high findings:
+
+```toml
+# ~/.config/reviewrules/settings.toml
+fail_on = "high"
+
+[[rule_sets]]
+name = "block"
+url = "https://github.com/milaboratory/block-review-rules.git"
+ref = "v0.1.0"
+```
+
+A CI job writes this file next to the user config that it passes with `--config`. The repo still needs a root rule folder with a `config.json` (see [Rule sets](#rule-sets)).
 
 ## Config keys
 
@@ -171,7 +196,7 @@ reviewrules checks both files before a run. On an error it stops with exit code 
 
 ## Print the merged config
 
-`reviewrules --print-config` prints every merged value and exits with code 0. It does not run a review. It reads the same files as a run: the repo settings of `--repo`, and the user config of `--config` in the case that `CI` selects. Each line has the key, the value, and the file that gave the value, or `default`:
+`reviewrules --print-config` prints every merged value and exits with code 0. It does not run a review. It reads the same files as a run: the global settings, the repo settings of `--repo`, and the user config of `--config` in the case that `CI` selects. Each line has the key, the value, and the file that gave the value, or `default`:
 
 ```text
 fail_on                          = "low"                                            # /repo/.reviewrules/settings.toml

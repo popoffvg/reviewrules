@@ -97,6 +97,8 @@ fail_on_unanswered = true
 
 Correctness checks are on by default. Set `correctness = false` in that same file to run only the rules. Backend and model choices belong in your user config. See [configuration](docs/configuration.md) for every key and default.
 
+To use the same policy in every repo, put these keys in `~/.config/reviewrules/settings.toml` (the global settings, next to the user config). A key in a repo's `.reviewrules/settings.toml` replaces the global value; a list such as `rule_sets` is replaced as a whole. See [global settings](docs/configuration.md#global-settings).
+
 For pull requests, set `CI=true` and configure the `[ci]` section of the user config. The report goes to stdout as JSON. The [CI guide](docs/ci.md) has a complete GitHub Actions job.
 
 ## Flags

@@ -69,6 +69,42 @@ func TestLoadReviewConfigUserCases(t *testing.T) {
 	}
 }
 
+func TestRepoSettingsKeyReplacesTheGlobalOne(t *testing.T) {
+	userPath := filepath.Join(t.TempDir(), "config.toml")
+	globalPath := filepath.Join(filepath.Dir(userPath), "settings.toml")
+	writeConfigFile(t, globalPath, `fail_on = "high"
+correctness = false
+
+[[rule_sets]]
+name = "block"
+url = "https://example.com/block-rules.git"
+ref = "v1"
+`)
+	repo := t.TempDir()
+	repoPath := filepath.Join(repo, ".reviewrules", "settings.toml")
+	writeConfigFile(t, repoPath, `fail_on = "low"
+
+[[rule_sets]]
+name = "go"
+url = "https://example.com/go-rules.git"
+ref = "v2"
+`)
+
+	config, err := LoadReviewConfig(userPath, UserConfigCaseLocal, repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.Repo.FailOn != "low" || config.Repo.Correctness || config.Repo.MaxDiffBytes != 300_000 {
+		t.Errorf("repo settings = %+v; want fail_on from the repo, correctness from global, the default max_diff_bytes", config.Repo)
+	}
+	if len(config.Repo.RuleSets) != 1 || config.Repo.RuleSets[0].Name != "go" {
+		t.Errorf("rule sets = %+v; want only the repo list", config.Repo.RuleSets)
+	}
+	if config.sources["fail_on"] != repoPath || config.sources["correctness"] != globalPath {
+		t.Errorf("sources = %v; want fail_on from %s and correctness from %s", config.sources, repoPath, globalPath)
+	}
+}
+
 func TestLoadReviewConfigMissingFilesGiveDefaults(t *testing.T) {
 	config, err := LoadReviewConfig(filepath.Join(t.TempDir(), "none.toml"), UserConfigCaseLocal, t.TempDir())
 	if err != nil {

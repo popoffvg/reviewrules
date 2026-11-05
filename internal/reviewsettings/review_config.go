@@ -33,31 +33,23 @@ func DefaultReviewConfig() ReviewConfig {
 	return ReviewConfig{Repo: DefaultRepoSettings(), User: DefaultUserConfig(), sources: map[string]string{}}
 }
 
-// LoadReviewConfig reads the repo settings of repoRoot and one case of the user config over the
-// defaults. A missing file or key keeps the default.
+// LoadReviewConfig reads the global settings, the repo settings of repoRoot, and one case of the
+// user config over the defaults. A missing file or key keeps the value below it.
 func LoadReviewConfig(userConfigPath string, userCase UserConfigCase, repoRoot string) (ReviewConfig, error) {
 	config := DefaultReviewConfig()
 
-	repoPath := filepath.Join(repoRoot, ".reviewrules", "settings.toml")
-	meta, err := toml.DecodeFile(repoPath, &config.Repo)
-	switch {
-	case errors.Is(err, fs.ErrNotExist):
-	case err != nil:
-		return config, fmt.Errorf("repo settings parse failed for %s: %w", repoPath, err)
-	default:
-		err = checkUndecodedKeys(ConfigFileRepoSettings, repoPath, meta.Undecoded())
+	for _, path := range []string{
+		globalSettingsPath(userConfigPath),
+		filepath.Join(repoRoot, ".reviewrules", "settings.toml"),
+	} {
+		err := config.decodeRepoSettings(path)
 		if err != nil {
 			return config, err
 		}
-		config.recordSources(ConfigFileRepoSettings, meta, nil, repoPath)
-	}
-	err = config.Repo.validate(repoPath)
-	if err != nil {
-		return config, err
 	}
 
 	file := userConfigFile{Local: DefaultUserConfig(), CI: DefaultUserConfig()}
-	meta, err = toml.DecodeFile(userConfigPath, &file)
+	meta, err := toml.DecodeFile(userConfigPath, &file)
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
 	case err != nil:
@@ -74,6 +66,30 @@ func LoadReviewConfig(userConfigPath string, userCase UserConfigCase, repoRoot s
 		config.recordSources(ConfigFileUserConfig, meta, toml.Key{string(userCase)}, fmt.Sprintf("%s [%s]", userConfigPath, userCase))
 	}
 	return config, config.User.validate()
+}
+
+// globalSettingsPath is settings.toml in the folder of the user config. It holds repo settings
+// keys for every repo; a key in a repo's .reviewrules/settings.toml replaces its value.
+func globalSettingsPath(userConfigPath string) string {
+	return filepath.Join(filepath.Dir(userConfigPath), "settings.toml")
+}
+
+// decodeRepoSettings reads one settings file over c.Repo. A key the file sets replaces the whole
+// value, a list too; a missing file changes nothing.
+func (c *ReviewConfig) decodeRepoSettings(path string) error {
+	meta, err := toml.DecodeFile(path, &c.Repo)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return nil
+	case err != nil:
+		return fmt.Errorf("repo settings parse failed for %s: %w", path, err)
+	}
+	err = checkUndecodedKeys(ConfigFileRepoSettings, path, meta.Undecoded())
+	if err != nil {
+		return err
+	}
+	c.recordSources(ConfigFileRepoSettings, meta, nil, path)
+	return c.Repo.validate(path)
 }
 
 // recordSources marks every key of file that the decoded file defines under prefix. A map key
