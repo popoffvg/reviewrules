@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -96,7 +97,8 @@ func (c *ReviewConfig) recordSources(file ConfigFile, meta toml.MetaData, prefix
 }
 
 // printedNames is the key name, or one name per entry of a map key in sorted order, or one name
-// per entry of a non-empty list of tables in list order, from the entry's Name field.
+// per entry of a non-empty list of tables in list order: the entry's Name field, else its
+// 1-based position, since the position decides which profile matches first.
 func (c ReviewConfig) printedNames(key ConfigKey) []toml.Key {
 	value := key.value(c)
 	switch {
@@ -110,7 +112,11 @@ func (c ReviewConfig) printedNames(key ConfigKey) []toml.Key {
 	case value.Kind() == reflect.Slice && value.Type().Elem().Kind() == reflect.Struct && value.Len() > 0:
 		names := make([]toml.Key, 0, value.Len())
 		for index := range value.Len() {
-			names = append(names, toml.Key{key.Name, value.Index(index).FieldByName("Name").String()})
+			name := strconv.Itoa(index + 1)
+			if field := value.Index(index).FieldByName("Name"); field.IsValid() {
+				name = field.String()
+			}
+			names = append(names, toml.Key{key.Name, name})
 		}
 		return names
 	}

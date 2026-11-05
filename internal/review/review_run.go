@@ -1,7 +1,6 @@
 package review
 
 import (
-	"cmp"
 	"context"
 	"fmt"
 	"log/slog"
@@ -21,9 +20,8 @@ type ReviewRunConfig struct {
 	IncludeWorktree bool
 	MaxDiffBytes    int
 	ModelName       string
-	// LargeDiffModel replaces ModelName when the diff has at least LargeDiffBytes bytes; empty keeps ModelName.
-	LargeDiffModel      string
-	LargeDiffBytes      int
+	// Profiles replace the model of an action when their If holds for the diff; see chooseActions.
+	Profiles            []ReviewProfile
 	HypothesisModelName string
 	// HypothesisCheckModelName answers each hypothesis; empty uses ModelName.
 	HypothesisCheckModelName string
@@ -45,8 +43,8 @@ type ReviewRunConfig struct {
 // RunReview loads the rules and the diff, runs the parent session once, then runs every
 // in-scope rule and every hypothesis as a fork of it, at most cfg.Parallel forks at a time.
 // The parent session finishes before any fork starts, so the first fork already finds its prefix in the cache.
-// cfg.HypothesisModelName writes the hypotheses, cfg.HypothesisCheckModelName answers them, and
-// the parent session and the rule forks run on cfg.ModelName, or on cfg.LargeDiffModel for a large diff.
+// The first matching profile of each action picks its model; with none, cfg.HypothesisModelName writes
+// the hypotheses, cfg.HypothesisCheckModelName answers them, and the parent and the rule forks run on cfg.ModelName.
 func RunReview(
 	ctx context.Context,
 	logger *slog.Logger,
@@ -76,7 +74,13 @@ func RunReview(
 	if len(diff.ChangedFiles) == 0 {
 		return report, fmt.Errorf("review diff is empty between %s and HEAD", cfg.Base)
 	}
-	report.Model, report.HypothesisModel, report.HypothesisCheckModel = cfg.reviewModels(len(diff.Patch))
+	choices, err := cfg.chooseActions(ProfileDiff{DiffBytes: len(diff.Patch), ChangedFiles: len(diff.ChangedFiles)})
+	if err != nil {
+		return report, err
+	}
+	report.Model = choices.Rules.Model
+	report.HypothesisModel = choices.Hypothesis.Model
+	report.HypothesisCheckModel = choices.HypothesisCheck.Model
 
 	var rules []rulecatalog.ReviewRule
 	for _, rule := range catalog.Rules {
@@ -93,16 +97,9 @@ func RunReview(
 
 	cacheKey := ReviewPromptCacheKey(diff)
 	agent := newAgent(cacheKey)
-	parentSettings := ForkSettings{Model: report.Model, ReasoningEffort: cfg.ReasoningEffort, MaxSteps: cfg.ParentMaxSteps}
-	forkSettings := ForkSettings{Model: report.Model, ReasoningEffort: cfg.ReasoningEffort, MaxSteps: cfg.ForkMaxSteps}
-	ruleSettings := forkSettings
-	if cfg.RuleReasoningEffort != "" {
-		ruleSettings.ReasoningEffort = cfg.RuleReasoningEffort
-	}
-	generatorSettings := forkSettings
-	generatorSettings.Model = report.HypothesisModel
-	checkSettings := forkSettings
-	checkSettings.Model = report.HypothesisCheckModel
+	parentSettings := ForkSettings{Model: choices.Rules.Model, ReasoningEffort: cfg.ReasoningEffort, MaxSteps: cfg.ParentMaxSteps}
+	ruleSettings, generatorSettings, checkSettings := choices.Rules, choices.Hypothesis, choices.HypothesisCheck
+	ruleSettings.MaxSteps, generatorSettings.MaxSteps, checkSettings.MaxSteps = cfg.ForkMaxSteps, cfg.ForkMaxSteps, cfg.ForkMaxSteps
 
 	logger.Info(
 		"review parent session started",
@@ -181,16 +178,6 @@ func RunReview(
 	report.Correctness.Usage = AddUsage(report.Correctness.GeneratorUsage, report.Correctness.CheckUsage)
 	report.TotalUsage = AddUsage(AddUsage(parent.Usage, report.RulesUsage), report.Correctness.Usage)
 	return report, nil
-}
-
-// reviewModels picks the model of each role for a diff of diffBytes bytes. An empty hypothesis
-// model follows the chosen model, so a large diff moves those forks to LargeDiffModel too.
-func (cfg ReviewRunConfig) reviewModels(diffBytes int) (model, hypothesisModel, checkModel string) {
-	model = cfg.ModelName
-	if cfg.LargeDiffModel != "" && diffBytes >= cfg.LargeDiffBytes {
-		model = cfg.LargeDiffModel
-	}
-	return model, cmp.Or(cfg.HypothesisModelName, model), cmp.Or(cfg.HypothesisCheckModelName, model)
 }
 
 func ruleSetInstructions(sets []rulecatalog.RuleSetInstructions) []prompts.RuleSetInstructions {

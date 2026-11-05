@@ -48,8 +48,7 @@ type UserConfig struct {
 	Agent                ReviewAgentKind                   `toml:"agent"                  description:"backend: fantasy (LiteLLM endpoint), openai, openrouter, or anthropic (direct API), claude or codex (built-in plugins), or an exec plugin name"`
 	BaseURL              string                            `toml:"base_url"               description:"endpoint for fantasy; for openai, openrouter, and anthropic only when it differs from the default LiteLLM URL"`
 	Model                string                            `toml:"model"                  description:"model for the parent session, the rule forks, and the hypothesis checkers"`
-	LargeDiffModel       string                            `toml:"large_diff_model"       description:"model that replaces model when the diff has at least large_diff_bytes bytes; an empty hypothesis_model or hypothesis_check_model follows it; empty keeps model"`
-	LargeDiffBytes       int                               `toml:"large_diff_bytes"       description:"diff size in bytes from which large_diff_model replaces model"`
+	Profiles             []review.ReviewProfile            `toml:"profiles"               description:"ordered [[<case>.profiles]] with if (an expr-lang expression over diff_bytes and changed_files; empty matches every diff), action (rules, hypothesis, or hypothesis_check), model, and optional reasoning_effort; for each action the first profile from the top whose if holds picks its model" default-text:"none"`
 	HypothesisModel      string                            `toml:"hypothesis_model"       description:"model that writes the correctness hypotheses"`
 	HypothesisCheckModel string                            `toml:"hypothesis_check_model" description:"model that answers each hypothesis; empty uses model"                                                                        default-text:"model"`
 	ReasoningEffort      string                            `toml:"reasoning_effort"       description:"effort for the parent session and the hypothesis forks"`
@@ -72,12 +71,10 @@ type userConfigFile struct {
 // DefaultUserConfig is what a run uses with no user config file.
 func DefaultUserConfig() UserConfig {
 	return UserConfig{
-		Agent:           ReviewAgentKindFantasy,
-		BaseURL:         "http://localhost:4000/v1",
-		Model:           "gpt-6-luna",
-		HypothesisModel: "gpt-6.1-sol",
-		// A small model lost the line numbers of its findings on a 172 KB diff and kept them on 19 KB.
-		LargeDiffBytes:      64 << 10,
+		Agent:               ReviewAgentKindFantasy,
+		BaseURL:             "http://localhost:4000/v1",
+		Model:               "gpt-6-luna",
+		HypothesisModel:     "gpt-6.1-sol",
 		ReasoningEffort:     "medium",
 		RuleReasoningEffort: "high",
 		Parallel:            8,
@@ -117,5 +114,5 @@ func (c UserConfig) validate() error {
 	if c.Agent == ReviewAgentKindUnknown {
 		return errors.New("user config agent is empty")
 	}
-	return nil
+	return review.CheckReviewProfiles(c.Profiles)
 }
