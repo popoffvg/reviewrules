@@ -82,6 +82,33 @@ func checkUndecodedKeys(file ConfigFile, path string, undecoded []toml.Key) erro
 	return fmt.Errorf("config key unknown: %q in %s", key.String(), path)
 }
 
+// inlineTable joins encoded TOML lines into one inline table; a [name] section becomes name = {…}.
+func inlineTable(encoded string) string {
+	var fields, nested []string
+	section := ""
+	closeSection := func() {
+		if section != "" {
+			fields = append(fields, section+" = {"+strings.Join(nested, ", ")+"}")
+		}
+		nested = nil
+	}
+	for line := range strings.SplitSeq(strings.TrimSpace(encoded), "\n") {
+		line = strings.TrimSpace(line)
+		switch {
+		case line == "":
+		case strings.HasPrefix(line, "["):
+			closeSection()
+			section = strings.Trim(line, "[]")
+		case section != "":
+			nested = append(nested, line)
+		default:
+			fields = append(fields, line)
+		}
+	}
+	closeSection()
+	return "{" + strings.Join(fields, ", ") + "}"
+}
+
 // formatConfigValue writes a value as TOML writes it; a struct becomes an inline table.
 func formatConfigValue(value reflect.Value) string {
 	if value.Kind() == reflect.Struct {
@@ -89,7 +116,7 @@ func formatConfigValue(value reflect.Value) string {
 		if err != nil {
 			return fmt.Sprint(value.Interface())
 		}
-		return "{" + strings.Join(strings.Split(strings.TrimSpace(string(encoded)), "\n"), ", ") + "}"
+		return inlineTable(string(encoded))
 	}
 	if value.Kind() == reflect.Slice && value.Len() == 0 {
 		return "[]"

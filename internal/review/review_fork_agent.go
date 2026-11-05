@@ -3,6 +3,7 @@ package review
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"charm.land/fantasy"
 )
@@ -14,7 +15,8 @@ import (
 // An agent runs one parent session in its lifetime.
 type ReviewForkAgent interface {
 	// StartParentSession runs the parent prompt to the end. It MUST finish before the first fork.
-	StartParentSession(ctx context.Context, prompt string, settings ForkSettings) (fantasy.Usage, error)
+	// The reply's ForkID and Text are empty.
+	StartParentSession(ctx context.Context, prompt string, settings ForkSettings) (ForkReply, error)
 	// ForkParentSession runs prompt as a new turn after the parent history; forks may run in parallel.
 	ForkParentSession(ctx context.Context, prompt string, settings ForkSettings) (ForkReply, error)
 	// ForkHypothesisLedger is the one checker fork. hypotheses is the protocol field of that request,
@@ -41,9 +43,20 @@ type ForkReply struct {
 	ForkID string
 	Text   string
 	Usage  fantasy.Usage
+	// Requests is the usage of each model request that Usage sums; empty when the backend reports
+	// only the total. A price that depends on the prompt size needs it.
+	Requests []fantasy.Usage
+}
+
+// withRetry adds the usage of a retry turn to the fork's usage.
+func (r ForkReply) withRetry(retry ForkReply) ForkReply {
+	r.Usage = AddUsage(r.Usage, retry.Usage)
+	r.Requests = append(slices.Clone(r.Requests), retry.Requests...)
+	return r
 }
 
 // forkReplyJSON decodes a fork's JSON reply and asks the fork once more when the reply has none.
+// It returns the fork with the retry's usage added, and the text it decoded.
 func forkReplyJSON(
 	ctx context.Context,
 	agent ReviewForkAgent,
@@ -52,17 +65,18 @@ func forkReplyJSON(
 	requiredKey string,
 	target any,
 	retryPrompt string,
-) (fantasy.Usage, string, error) {
+) (ForkReply, string, error) {
 	if decodeForkJSONReply(fork.Text, requiredKey, target) == nil {
-		return fantasy.Usage{}, fork.Text, nil
+		return fork, fork.Text, nil
 	}
 	retrySettings := settings
 	retrySettings.MaxSteps = 1
 	retry, err := agent.AppendToFork(ctx, fork.ForkID, retryPrompt, retrySettings)
+	spent := fork.withRetry(retry)
 	if err != nil {
-		return retry.Usage, fork.Text, fmt.Errorf("fork JSON retry failed: %w", err)
+		return spent, fork.Text, fmt.Errorf("fork JSON retry failed: %w", err)
 	}
-	return retry.Usage, retry.Text, decodeForkJSONReply(retry.Text, requiredKey, target)
+	return spent, retry.Text, decodeForkJSONReply(retry.Text, requiredKey, target)
 }
 
 // AddUsage sums two usage records.

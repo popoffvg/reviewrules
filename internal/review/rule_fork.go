@@ -39,6 +39,7 @@ type RuleCheckResult struct {
 	Error    string               `json:"error,omitempty"`
 	RawReply string               `json:"raw_reply,omitempty"`
 	Usage    fantasy.Usage        `json:"usage"`
+	Requests []fantasy.Usage      `json:"requests,omitempty"`
 }
 
 // RequirementCheck is the fork's answer for one atomic requirement of a rule.
@@ -75,8 +76,8 @@ func CheckRuleInFork(
 		return check
 	}
 	var reply ruleForkReply
-	retryUsage, replyText, err := forkReplyJSON(ctx, agent, settings, fork, "verdict", &reply, text.JSONOnlyRetry)
-	check.Usage = AddUsage(fork.Usage, retryUsage)
+	spent, replyText, err := forkReplyJSON(ctx, agent, settings, fork, "verdict", &reply, text.JSONOnlyRetry)
+	check.Usage, check.Requests = spent.Usage, spent.Requests
 	if err != nil {
 		check.Error = err.Error()
 		check.RawReply = replyText

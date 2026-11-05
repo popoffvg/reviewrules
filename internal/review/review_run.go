@@ -123,7 +123,7 @@ func RunReview(
 	if text.ReviewSystem == "" {
 		text = prompts.Default()
 	}
-	parentUsage, err := agent.StartParentSession(ctx, text.ParentSession(prompts.ParentSessionInput{
+	parent, err := agent.StartParentSession(ctx, text.ParentSession(prompts.ParentSessionInput{
 		Instructions:        catalog.Instructions,
 		RuleSetInstructions: ruleSetInstructions(catalog.RuleSetInstructions),
 		Docs:                docs,
@@ -134,8 +134,8 @@ func RunReview(
 	if err != nil {
 		return report, err
 	}
-	report.ParentUsage = parentUsage
-	logger.Info("review parent session done", "usage", parentUsage.String())
+	report.ParentUsage, report.ParentRequests = parent.Usage, parent.Requests
+	logger.Info("review parent session done", "usage", parent.Usage.String())
 
 	limit := make(chan struct{}, max(cfg.Parallel, 1))
 	var wait sync.WaitGroup
@@ -155,15 +155,15 @@ func RunReview(
 	if cfg.CorrectnessEnabled {
 		wait.Go(func() {
 			limit <- struct{}{}
-			hypotheses, usage, err := GenerateHypothesesInFork(ctx, agent, generatorSettings, text)
+			hypotheses, spent, err := GenerateHypothesesInFork(ctx, agent, generatorSettings, text)
 			<-limit
 			lock.Lock()
-			report.Correctness.GeneratorUsage = usage
+			report.Correctness.GeneratorUsage, report.Correctness.GeneratorRequests = spent.Usage, spent.Requests
 			if err != nil {
 				report.Correctness.GeneratorError = err.Error()
 			}
 			lock.Unlock()
-			logger.Info("review hypothesis generator done", "hypotheses", len(hypotheses), "usage", usage.String())
+			logger.Info("review hypothesis generator done", "hypotheses", len(hypotheses), "usage", spent.Usage.String())
 
 			var checks []HypothesisCheck
 			if err == nil {
@@ -186,7 +186,7 @@ func RunReview(
 		report.Correctness.CheckUsage = AddUsage(report.Correctness.CheckUsage, check.Usage)
 	}
 	report.Correctness.Usage = AddUsage(report.Correctness.GeneratorUsage, report.Correctness.CheckUsage)
-	report.TotalUsage = AddUsage(AddUsage(parentUsage, report.RulesUsage), report.Correctness.Usage)
+	report.TotalUsage = AddUsage(AddUsage(parent.Usage, report.RulesUsage), report.Correctness.Usage)
 	return report, nil
 }
 

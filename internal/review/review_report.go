@@ -15,12 +15,14 @@ type ReviewReport struct {
 	HypothesisModel      string `json:"hypothesis_model"`
 	HypothesisCheckModel string `json:"hypothesis_check_model"`
 	// RuleDirs are the rule folders the run read, the root one first.
-	RuleDirs       []string           `json:"rule_dirs"`
-	ChangedFiles   []string           `json:"changed_files"`
-	SkippedRuleIDs []string           `json:"skipped_rule_ids"`
-	Rules          []RuleCheckResult  `json:"rules"`
-	Correctness    CorrectnessReport  `json:"correctness"`
-	ParentUsage    fantasy.Usage      `json:"parent_usage"`
+	RuleDirs       []string          `json:"rule_dirs"`
+	ChangedFiles   []string          `json:"changed_files"`
+	SkippedRuleIDs []string          `json:"skipped_rule_ids"`
+	Rules          []RuleCheckResult `json:"rules"`
+	Correctness    CorrectnessReport `json:"correctness"`
+	ParentUsage    fantasy.Usage     `json:"parent_usage"`
+	// ParentRequests is the usage of each model request of the parent session, when the backend reports them.
+	ParentRequests []fantasy.Usage    `json:"parent_requests,omitempty"`
 	RulesUsage     fantasy.Usage      `json:"rules_usage"`
 	TotalUsage     fantasy.Usage      `json:"total_usage"`
 	Cost           ReviewCostEstimate `json:"cost_estimate"`
@@ -28,10 +30,11 @@ type ReviewReport struct {
 
 // CorrectnessReport holds the generator outcome and one check per hypothesis.
 type CorrectnessReport struct {
-	Enabled        bool          `json:"enabled"`
-	GeneratorError string        `json:"generator_error,omitempty"`
-	GeneratorUsage fantasy.Usage `json:"generator_usage"`
-	CheckUsage     fantasy.Usage `json:"check_usage"`
+	Enabled           bool            `json:"enabled"`
+	GeneratorError    string          `json:"generator_error,omitempty"`
+	GeneratorUsage    fantasy.Usage   `json:"generator_usage"`
+	GeneratorRequests []fantasy.Usage `json:"generator_requests,omitempty"`
+	CheckUsage        fantasy.Usage   `json:"check_usage"`
 	// Usage is GeneratorUsage plus CheckUsage.
 	Usage           fantasy.Usage     `json:"usage"`
 	HypothesisCheck []HypothesisCheck `json:"hypotheses"`

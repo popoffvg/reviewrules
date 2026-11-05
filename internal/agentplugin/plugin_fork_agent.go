@@ -34,10 +34,10 @@ func (a *PluginForkAgent) StartParentSession(
 	ctx context.Context,
 	prompt string,
 	settings review.ForkSettings,
-) (fantasy.Usage, error) {
+) (review.ForkReply, error) {
 	reply, err := a.plugin.RunOperation(ctx, OperationStartParent, a.pluginRequest(prompt, settings))
 	a.parentSessionID = reply.SessionID
-	return reply.Usage.fantasyUsage(), err
+	return review.ForkReply{Usage: reply.Usage.fantasyUsage()}, err
 }
 
 // ForkParentSession runs fork with the parent session id.

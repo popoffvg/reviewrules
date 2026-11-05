@@ -47,6 +47,48 @@ func TestEstimateReviewCost(t *testing.T) {
 	})
 }
 
+func TestEstimateReviewCostPricesCacheWritesAndLongPrompts(t *testing.T) {
+	prices := map[string]ModelTokenPrice{"tiered": {
+		Input: 1, CachedInput: 0.1, CacheWrite: 1.25, Output: 5,
+		LongPromptTokens: 100_000,
+		LongPrompt:       &ModelTokenPrice{Input: 10, CachedInput: 1, CacheWrite: 12.5, Output: 50},
+	}}
+	short := fantasy.Usage{InputTokens: 100_000, OutputTokens: 1_000}
+	long := fantasy.Usage{CacheReadTokens: 100_000, CacheCreationTokens: 1, OutputTokens: 1_000}
+	cases := []struct {
+		name   string
+		report ReviewReport
+		want   float64
+	}{
+		// 100,000 input tokens is not more than the limit: 0.1M*1 + 0.001M*5.
+		{"request-at-the-limit-uses-the-base-tier", ReviewReport{
+			Model: "tiered", ParentUsage: short, ParentRequests: []fantasy.Usage{short},
+		}, 0.105},
+		// 100,001 input tokens: 0.1M*1 (read) + 0.000001M*12.5 (write) + 0.001M*50.
+		{"request-over-the-limit-uses-the-long-tier", ReviewReport{
+			Model: "tiered", ParentUsage: long, ParentRequests: []fantasy.Usage{long},
+		}, 0.1500125},
+		// One total, so the request sizes are unknown: base tier, 0.1M*0.1 + 0.000001M*1.25 + 0.001M*5.
+		{"total-without-requests-uses-the-base-tier", ReviewReport{
+			Model: "tiered", ParentUsage: long,
+		}, 0.01500125},
+		// Each rule's requests are priced on their own tier.
+		{"rule-requests-are-priced-one-by-one", ReviewReport{
+			Model:      "tiered",
+			RulesUsage: AddUsage(short, long),
+			Rules: []RuleCheckResult{
+				{Usage: short, Requests: []fantasy.Usage{short}},
+				{Usage: long, Requests: []fantasy.Usage{long}},
+			},
+		}, 0.2550125},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assertCloseUSD(t, tc.name, EstimateReviewCost(tc.report, prices).TotalUSD, tc.want)
+		})
+	}
+}
+
 func assertCloseUSD(t testing.TB, name string, got float64, want float64) {
 	t.Helper()
 	if math.Abs(got-want) > 1e-9 {

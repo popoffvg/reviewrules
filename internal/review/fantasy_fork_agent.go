@@ -62,10 +62,10 @@ func (a *FantasyForkAgent) StartParentSession(
 	ctx context.Context,
 	prompt string,
 	settings ForkSettings,
-) (fantasy.Usage, error) {
+) (ForkReply, error) {
 	agent, err := a.agentFor(ctx, settings)
 	if err != nil {
-		return fantasy.Usage{}, err
+		return ForkReply{}, err
 	}
 	result, err := agent.Generate(ctx, fantasy.AgentCall{
 		Prompt:      prompt,
@@ -73,7 +73,7 @@ func (a *FantasyForkAgent) StartParentSession(
 		PrepareStep: cacheEachStep,
 	})
 	if err != nil {
-		return fantasy.Usage{}, fmt.Errorf("parent session failed: %w", err)
+		return ForkReply{}, fmt.Errorf("parent session failed: %w", err)
 	}
 	history := []fantasy.Message{fantasy.NewUserMessage(prompt)}
 	for _, step := range result.Steps {
@@ -82,7 +82,16 @@ func (a *FantasyForkAgent) StartParentSession(
 	a.mutex.Lock()
 	a.history = history
 	a.mutex.Unlock()
-	return result.TotalUsage, nil
+	return ForkReply{Usage: result.TotalUsage, Requests: stepUsages(result.Steps)}, nil
+}
+
+// stepUsages lists the usage of each model request of one Generate call.
+func stepUsages(steps []fantasy.StepResult) []fantasy.Usage {
+	usages := make([]fantasy.Usage, 0, len(steps))
+	for _, step := range steps {
+		usages = append(usages, step.Usage)
+	}
+	return usages
 }
 
 // ForkParentSession runs prompt after the parent history.
@@ -154,7 +163,12 @@ func (a *FantasyForkAgent) generateFork(
 	}
 	a.forks[forkID] = forkHistory
 	a.mutex.Unlock()
-	return ForkReply{ForkID: forkID, Text: result.Response.Content.Text(), Usage: result.TotalUsage}, nil
+	return ForkReply{
+		ForkID:   forkID,
+		Text:     result.Response.Content.Text(),
+		Usage:    result.TotalUsage,
+		Requests: stepUsages(result.Steps),
+	}, nil
 }
 
 // agentFor builds one Fantasy agent per model and effort. Every agent keeps the same system
