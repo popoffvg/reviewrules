@@ -9,7 +9,7 @@ reviewrules reviews a git diff against the rules in `.reviewrules/` and in the e
 | Package | What it owns |
 |---|---|
 | `main.go` | the user config case, `--print-config`, the backend choice (API backend, built-in plugin, or exec plugin), the summary and the exit code |
-| `internal/reviewsettings` | the two config files: the repo settings `.reviewrules/settings.toml` (`RepoSettings`) and the user config `~/.config/reviewrules/config.toml` with its `[local]` and `[ci]` cases (`UserConfig`). `ConfigKeys()` is the key table: one row per struct field (`toml`, `description`, `default-text` tags). It drives the unknown-key and wrong-file checks, `--print-config`, and the docs Config keys table |
+| `internal/reviewsettings` | the config files: the repo settings `.reviewrules/settings.toml` (`RepoSettings`) over the global settings `settings.toml` next to the user config (same keys), and the user config `~/.config/reviewrules/config.toml` with its `[local]` and `[ci]` cases (`UserConfig`). `ConfigKeys()` is the key table: one row per struct field (`toml`, `description`, `default-text` tags). It drives the unknown-key and wrong-file checks, `--print-config`, and the docs Config keys table |
 | `internal/reviewcli` | the command line (go-flags): the six flags and `--print-config`; the README Flags table and the `docs/configuration.md` Config keys table that `go generate` writes (`readmetables`) |
 | `internal/rulecatalog` | loads the rule folders that `rule_folders` names, the scoped docs, and splits a list rule into one check per item |
 | `internal/ruleset` | the `[[rule_sets]]` entries (`RuleSet`, `RuleSetList`), the git fetch and cache (`FetchRuleSets`); see docs/rule-sets.md |
