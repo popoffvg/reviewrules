@@ -106,6 +106,8 @@ func runReviewRules() int {
 		IncludeWorktree:          options.Worktree,
 		MaxDiffBytes:             config.Repo.MaxDiffBytes,
 		ModelName:                userConfig.Model,
+		LargeDiffModel:           userConfig.LargeDiffModel,
+		LargeDiffBytes:           userConfig.LargeDiffBytes,
 		HypothesisModelName:      userConfig.HypothesisModel,
 		HypothesisCheckModelName: userConfig.HypothesisCheckModel,
 		ReasoningEffort:          userConfig.ReasoningEffort,

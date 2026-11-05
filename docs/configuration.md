@@ -25,6 +25,8 @@ reviewrules has five flags and `--print-config` (see the Flags table in `README.
 | `agent` | `~/.config/reviewrules/config.toml` | `"fantasy"` | backend: fantasy (LiteLLM endpoint), openai, openrouter, or anthropic (direct API), claude or codex (built-in plugins), or an exec plugin name |
 | `base_url` | `~/.config/reviewrules/config.toml` | `"http://localhost:4000/v1"` | endpoint for fantasy; for openai, openrouter, and anthropic only when it differs from the default LiteLLM URL |
 | `model` | `~/.config/reviewrules/config.toml` | `"gpt-6-luna"` | model for the parent session, the rule forks, and the hypothesis checkers |
+| `large_diff_model` | `~/.config/reviewrules/config.toml` | `""` | model that replaces model when the diff has at least large_diff_bytes bytes; an empty hypothesis_model or hypothesis_check_model follows it; empty keeps model |
+| `large_diff_bytes` | `~/.config/reviewrules/config.toml` | `65536` | diff size in bytes from which large_diff_model replaces model |
 | `hypothesis_model` | `~/.config/reviewrules/config.toml` | `"gpt-6.1-sol"` | model that writes the correctness hypotheses |
 | `hypothesis_check_model` | `~/.config/reviewrules/config.toml` | `model` | model that answers each hypothesis; empty uses model |
 | `reasoning_effort` | `~/.config/reviewrules/config.toml` | `"medium"` | effort for the parent session and the hypothesis forks |

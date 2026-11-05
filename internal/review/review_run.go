@@ -1,6 +1,7 @@
 package review
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"log/slog"
@@ -15,11 +16,14 @@ import (
 
 // ReviewRunConfig is the static setup of one review run.
 type ReviewRunConfig struct {
-	RepoRoot            string
-	Base                string
-	IncludeWorktree     bool
-	MaxDiffBytes        int
-	ModelName           string
+	RepoRoot        string
+	Base            string
+	IncludeWorktree bool
+	MaxDiffBytes    int
+	ModelName       string
+	// LargeDiffModel replaces ModelName when the diff has at least LargeDiffBytes bytes; empty keeps ModelName.
+	LargeDiffModel      string
+	LargeDiffBytes      int
 	HypothesisModelName string
 	// HypothesisCheckModelName answers each hypothesis; empty uses ModelName.
 	HypothesisCheckModelName string
@@ -42,27 +46,14 @@ type ReviewRunConfig struct {
 // in-scope rule and every hypothesis as a fork of it, at most cfg.Parallel forks at a time.
 // The parent session finishes before any fork starts, so the first fork already finds its prefix in the cache.
 // cfg.HypothesisModelName writes the hypotheses, cfg.HypothesisCheckModelName answers them, and
-// the parent session and the rule forks run on cfg.ModelName.
+// the parent session and the rule forks run on cfg.ModelName, or on cfg.LargeDiffModel for a large diff.
 func RunReview(
 	ctx context.Context,
 	logger *slog.Logger,
 	newAgent ReviewForkAgentFactory,
 	cfg ReviewRunConfig,
 ) (ReviewReport, error) {
-	hypothesisModel := cfg.HypothesisModelName
-	if hypothesisModel == "" {
-		hypothesisModel = cfg.ModelName
-	}
-	checkModel := cfg.HypothesisCheckModelName
-	if checkModel == "" {
-		checkModel = cfg.ModelName
-	}
-	report := ReviewReport{
-		Base:                 cfg.Base,
-		Model:                cfg.ModelName,
-		HypothesisModel:      hypothesisModel,
-		HypothesisCheckModel: checkModel,
-	}
+	report := ReviewReport{Base: cfg.Base, Model: cfg.ModelName}
 
 	catalog, err := rulecatalog.LoadReviewRules(ctx, cfg.RepoRoot, cfg.RuleFolders, cfg.RuleSets)
 	if err != nil {
@@ -85,6 +76,7 @@ func RunReview(
 	if len(diff.ChangedFiles) == 0 {
 		return report, fmt.Errorf("review diff is empty between %s and HEAD", cfg.Base)
 	}
+	report.Model, report.HypothesisModel, report.HypothesisCheckModel = cfg.reviewModels(len(diff.Patch))
 
 	var rules []rulecatalog.ReviewRule
 	for _, rule := range catalog.Rules {
@@ -101,21 +93,22 @@ func RunReview(
 
 	cacheKey := ReviewPromptCacheKey(diff)
 	agent := newAgent(cacheKey)
-	parentSettings := ForkSettings{Model: cfg.ModelName, ReasoningEffort: cfg.ReasoningEffort, MaxSteps: cfg.ParentMaxSteps}
-	forkSettings := ForkSettings{Model: cfg.ModelName, ReasoningEffort: cfg.ReasoningEffort, MaxSteps: cfg.ForkMaxSteps}
+	parentSettings := ForkSettings{Model: report.Model, ReasoningEffort: cfg.ReasoningEffort, MaxSteps: cfg.ParentMaxSteps}
+	forkSettings := ForkSettings{Model: report.Model, ReasoningEffort: cfg.ReasoningEffort, MaxSteps: cfg.ForkMaxSteps}
 	ruleSettings := forkSettings
 	if cfg.RuleReasoningEffort != "" {
 		ruleSettings.ReasoningEffort = cfg.RuleReasoningEffort
 	}
 	generatorSettings := forkSettings
-	generatorSettings.Model = hypothesisModel
+	generatorSettings.Model = report.HypothesisModel
 	checkSettings := forkSettings
-	checkSettings.Model = checkModel
+	checkSettings.Model = report.HypothesisCheckModel
 
 	logger.Info(
 		"review parent session started",
 		"changed_files", len(diff.ChangedFiles),
 		"diff_bytes", len(diff.Patch),
+		"model", report.Model,
 		"prompt_cache_key", cacheKey,
 		"reasoning_effort", cfg.ReasoningEffort,
 	)
@@ -188,6 +181,16 @@ func RunReview(
 	report.Correctness.Usage = AddUsage(report.Correctness.GeneratorUsage, report.Correctness.CheckUsage)
 	report.TotalUsage = AddUsage(AddUsage(parent.Usage, report.RulesUsage), report.Correctness.Usage)
 	return report, nil
+}
+
+// reviewModels picks the model of each role for a diff of diffBytes bytes. An empty hypothesis
+// model follows the chosen model, so a large diff moves those forks to LargeDiffModel too.
+func (cfg ReviewRunConfig) reviewModels(diffBytes int) (model, hypothesisModel, checkModel string) {
+	model = cfg.ModelName
+	if cfg.LargeDiffModel != "" && diffBytes >= cfg.LargeDiffBytes {
+		model = cfg.LargeDiffModel
+	}
+	return model, cmp.Or(cfg.HypothesisModelName, model), cmp.Or(cfg.HypothesisCheckModelName, model)
 }
 
 func ruleSetInstructions(sets []rulecatalog.RuleSetInstructions) []prompts.RuleSetInstructions {
