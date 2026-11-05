@@ -86,7 +86,14 @@ func runReviewRules() int {
 		return 2
 	}
 	userConfig := config.User
-	newAgent, err := newReviewForkAgentFactory(userConfig, root, agentPrompts)
+	if options.SessionDir != "" {
+		err = os.MkdirAll(options.SessionDir, 0o750)
+		if err != nil {
+			logger.Error("reviewrules session folder create failed", "error", err)
+			return 2
+		}
+	}
+	newAgent, err := newReviewForkAgentFactory(userConfig, root, agentPrompts, options.SessionDir)
 	if err != nil {
 		logger.Error("reviewrules agent setup failed", "error", err)
 		return 2
@@ -160,12 +167,21 @@ func runReviewRules() int {
 }
 
 // newReviewForkAgentFactory picks the backend the user config names: an API backend, then a built-in
-// agent plugin, then the exec plugin of that name in the plugin folder.
-func newReviewForkAgentFactory(settings reviewsettings.UserConfig, repoRoot string, text prompts.Set) (review.ReviewForkAgentFactory, error) {
+// agent plugin, then the exec plugin of that name in the plugin folder. Only an API backend saves
+// session files; a plugin agent keeps its sessions in its own place.
+func newReviewForkAgentFactory(
+	settings reviewsettings.UserConfig,
+	repoRoot string,
+	text prompts.Set,
+	sessionDir string,
+) (review.ReviewForkAgentFactory, error) {
 	for _, endpoint := range reviewEndpoints() {
 		if endpoint.agent == settings.Agent {
-			return newEndpointAgentFactory(settings, endpoint, repoRoot, text)
+			return newEndpointAgentFactory(settings, endpoint, repoRoot, text, sessionDir)
 		}
+	}
+	if sessionDir != "" {
+		return nil, fmt.Errorf("reviewrules --session-dir needs an API backend, and agent %s is a plugin", settings.Agent)
 	}
 	plugin, err := selectAgentPlugin(settings)
 	if err != nil {
@@ -224,6 +240,7 @@ func newEndpointAgentFactory(
 	endpoint reviewEndpoint,
 	repoRoot string,
 	text prompts.Set,
+	sessionDir string,
 ) (review.ReviewForkAgentFactory, error) {
 	baseURL := endpoint.baseURL
 	if baseURL == "" || settings.BaseURL != reviewsettings.DefaultUserConfig().BaseURL {
@@ -242,7 +259,7 @@ func newEndpointAgentFactory(
 		return nil, err
 	}
 	return func(promptCacheKey string) review.ReviewForkAgent {
-		return review.NewFantasyForkAgent(provider, repoRoot, endpoint.callOptions(promptCacheKey), text)
+		return review.NewFantasyForkAgent(provider, repoRoot, endpoint.callOptions(promptCacheKey), text, sessionDir)
 	}, nil
 }
 

@@ -1,6 +1,6 @@
 # Configuration
 
-reviewrules has five flags and `--print-config` (see the Flags table in `README.md`). Every other choice is a key in one of two TOML files. Each key has one owner file.
+reviewrules has six flags and `--print-config` (see the Flags table in `README.md`). Every other choice is a key in one of two TOML files. Each key has one owner file.
 
 | File | Who writes it | What it holds |
 |---|---|---|

@@ -37,6 +37,18 @@ jobs:
 
 Replace `<sha or tag>` with a commit SHA or a tag of reviewrules, so that each run uses the same version. `actions/setup-go` puts `$(go env GOPATH)/bin` on `PATH`. Use commit-pinned actions, as in this repo's `.github/workflows/ci.yaml`. To run on a ChatGPT subscription instead, host the LiteLLM proxy near the runners ([shared proxy setup](../deploy/litellm/README.md)) and set `agent = "fantasy"` and `base_url = "<proxy>/v1"` in the `[ci]` case, with `LITELLM_API_KEY`. The job can also pass `--config` with a user config that the repo commits.
 
+## Keep the sessions
+
+To read what each model call saw and answered, add `--session-dir "$RUNNER_TEMP/reviewrules-sessions"` and upload that folder as an artifact. It holds `parent.json` (the system prompt and the parent session) and one `fork-<id>.json` per fork with the messages after the parent session. The first message of a fork is its prompt, which names the rule or the hypothesis. Only the API backends write these files.
+
+```yaml
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: reviewrules-sessions
+          path: ${{ runner.temp }}/reviewrules-sessions
+```
+
 ## Decide what fails the job
 
 Commit the policy in `.reviewrules/settings.toml`:
