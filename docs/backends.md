@@ -8,10 +8,11 @@ Set `agent` in the user config (see [Configuration](configuration.md)). All back
 | `claude` | the local `claude` binary | `claude` then `/login`, or `ANTHROPIC_API_KEY` | `haiku` / `opus`, with `hypothesis_check_model = "sonnet"` |
 | `openai` | `https://api.openai.com/v1` | `OPENAI_API_KEY` | `gpt-6-luna` / `gpt-6.1-sol` |
 | `openrouter` | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` | `openai/gpt-6-luna` / `openai/gpt-6.1-sol` |
+| `anthropic` | `https://api.anthropic.com` | `ANTHROPIC_API_KEY` | `claude-haiku-5-5` / `claude-opus-5-5`, with `hypothesis_check_model = "claude-sonnet-5-5"` |
 | `fantasy` | a LiteLLM proxy at `base_url` | `LITELLM_API_KEY` | the proxy's model names |
 | `<name>` | the exec plugin `reviewrules-agent-<name>` in `plugin_dir` | what the plugin needs | what the plugin accepts |
 
-Use `fantasy` for a LiteLLM proxy. The proxy route can use a ChatGPT subscription; the built-in `codex` backend uses the local CLI login directly. With an API key, `openai` or `openrouter` needs no proxy. See [LiteLLM setup](litellm.md).
+Use `fantasy` for a LiteLLM proxy. The proxy route can use a ChatGPT subscription; the built-in `codex` backend uses the local CLI login directly. With an API key, `openai`, `openrouter`, or `anthropic` needs no proxy. The `anthropic` backend marks the end of each request as a prompt cache breakpoint, so the forks read the parent prefix from the cache. See [LiteLLM setup](litellm.md).
 
 To add a different agent, see [agent plugins](agent-plugins.md).
 

@@ -9,7 +9,7 @@ An exec plugin is one executable file. reviewrules runs it once per call, with t
 
 ## Steps
 
-1. **Pick the name.** The file name is `reviewrules-agent-<name>`. `<name>` MUST NOT be `codex`, `claude`, `openai`, `openrouter`, or `fantasy`: those names select a built-in backend first. Done when the name has no `/` and no built-in uses it.
+1. **Pick the name.** The file name is `reviewrules-agent-<name>`. `<name>` MUST NOT be `codex`, `claude`, `openai`, `openrouter`, `anthropic`, or `fantasy`: those names select a built-in backend first. Done when the name has no `/` and no built-in uses it.
 2. **Map the three operations to the backend.** Write one backend command for each of `start-parent`, `fork`, and `append`, as section "Operations" of the protocol doc says. The table at the end of that doc shows how codex, claude, pi, and opencode do it. Done when each operation has one command, `fork` copies the history and leaves the source session as it is, and `append` makes no new session.
 3. **Make it read-only.** Give the model only read and search tools, or a read-only sandbox, in `repo_root`. Done when no tool the model gets can write a file.
 4. **Write the plugin.** Start from the example below. Follow section "Plugin rules" of the protocol doc. Done when `bash -n` (or the language's compiler) passes and the file is executable.

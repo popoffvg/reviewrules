@@ -27,7 +27,7 @@ The key `agent` in the user config `~/.config/reviewrules/config.toml` (see [con
 
 | Order | Names | Backend |
 |---|---|---|
-| 1 | `fantasy`, `openai`, `openrouter` | an API backend in reviewrules. It is not a plugin. |
+| 1 | `fantasy`, `openai`, `openrouter`, `anthropic` | an API backend in reviewrules. It is not a plugin. |
 | 2 | `codex`, `claude` | a built-in plugin. It is compiled into reviewrules and uses this protocol in-process, with no subprocess for the protocol. |
 | 3 | any other name | the exec plugin `<plugin_dir>/reviewrules-agent-<name>` |
 

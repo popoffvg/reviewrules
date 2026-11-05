@@ -22,8 +22,8 @@ reviewrules has five flags and `--print-config` (see the Flags table in `README.
 | `correctness` | `.reviewrules/settings.toml` | `true` | run the hypothesis generator and one checker fork per hypothesis |
 | `max_diff_bytes` | `.reviewrules/settings.toml` | `300000` | refuse a diff larger than this |
 | `rule_sets` | `.reviewrules/settings.toml` | `[]` | shared rule sets [[rule_sets]] with name, url, ref; each adds the rules of its root .reviewrules/ as &lt;name&gt;/&lt;rule id&gt; |
-| `agent` | `~/.config/reviewrules/config.toml` | `"fantasy"` | backend: fantasy (LiteLLM endpoint), openai or openrouter (direct API), claude or codex (built-in plugins), or an exec plugin name |
-| `base_url` | `~/.config/reviewrules/config.toml` | `"http://localhost:4000/v1"` | endpoint for fantasy; for openai and openrouter only when it differs from the default LiteLLM URL |
+| `agent` | `~/.config/reviewrules/config.toml` | `"fantasy"` | backend: fantasy (LiteLLM endpoint), openai, openrouter, or anthropic (direct API), claude or codex (built-in plugins), or an exec plugin name |
+| `base_url` | `~/.config/reviewrules/config.toml` | `"http://localhost:4000/v1"` | endpoint for fantasy; for openai, openrouter, and anthropic only when it differs from the default LiteLLM URL |
 | `model` | `~/.config/reviewrules/config.toml` | `"gpt-6-luna"` | model for the parent session, the rule forks, and the hypothesis checkers |
 | `hypothesis_model` | `~/.config/reviewrules/config.toml` | `"gpt-6.1-sol"` | model that writes the correctness hypotheses |
 | `hypothesis_check_model` | `~/.config/reviewrules/config.toml` | `model` | model that answers each hypothesis; empty uses model |
