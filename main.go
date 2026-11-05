@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"charm.land/fantasy"
+	"charm.land/fantasy/providers/anthropic"
 	"charm.land/fantasy/providers/openaicompat"
 	"github.com/jessevdk/go-flags"
 
@@ -216,7 +217,7 @@ func selectAgentPlugin(settings reviewsettings.UserConfig) (agentplugin.AgentPlu
 	return agentplugin.FindExecAgentPlugin(settings.PluginDir, string(settings.Agent))
 }
 
-// newEndpointAgentFactory builds the fantasy agent for one OpenAI-compatible backend.
+// newEndpointAgentFactory builds the fantasy agent for one API backend.
 func newEndpointAgentFactory(
 	settings reviewsettings.UserConfig,
 	endpoint reviewEndpoint,
@@ -235,31 +236,65 @@ func newEndpointAgentFactory(
 		// LiteLLM without a master key accepts any bearer token.
 		apiKey = "sk-local"
 	}
-	provider, err := openaicompat.New(openaicompat.WithBaseURL(baseURL), openaicompat.WithAPIKey(apiKey))
+	provider, err := endpoint.newProvider(baseURL, apiKey)
 	if err != nil {
 		return nil, err
 	}
 	return func(promptCacheKey string) review.ReviewForkAgent {
-		return review.NewFantasyForkAgent(provider, repoRoot, promptCacheKey, endpoint.liteLLMSession, text)
+		return review.NewFantasyForkAgent(provider, repoRoot, endpoint.callOptions(promptCacheKey), text)
 	}, nil
 }
 
-// reviewEndpoint is one row of the OpenAI-compatible backends the fantasy agent code serves.
+// reviewEndpoint is one row of the API backends the fantasy agent code serves.
 type reviewEndpoint struct {
-	agent          reviewsettings.ReviewAgentKind
-	baseURL        string
-	apiKeyEnv      string
-	liteLLMSession bool
+	agent       reviewsettings.ReviewAgentKind
+	baseURL     string
+	apiKeyEnv   string
+	newProvider func(baseURL, apiKey string) (fantasy.Provider, error)
+	callOptions func(promptCacheKey string) review.FantasyCallOptions
 }
 
-// reviewEndpoints lists the OpenAI-compatible backends; an empty baseURL means the settings' base_url.
+// reviewEndpoints lists the API backends; an empty baseURL means the settings' base_url.
+// apiKeyEnv holds the name of an environment variable, not a key.
 func reviewEndpoints() []reviewEndpoint {
 	return []reviewEndpoint{
-		// apiKeyEnv holds the name of an environment variable, not a key.
-		{agent: reviewsettings.ReviewAgentKindFantasy, baseURL: "", apiKeyEnv: "LITELLM_API_KEY", liteLLMSession: true},             //nolint:gosec // G101: a variable name, not a credential
-		{agent: reviewsettings.ReviewAgentKindOpenAI, baseURL: "https://api.openai.com/v1", apiKeyEnv: "OPENAI_API_KEY"},            //nolint:gosec // G101: a variable name, not a credential
-		{agent: reviewsettings.ReviewAgentKindOpenRouter, baseURL: "https://openrouter.ai/api/v1", apiKeyEnv: "OPENROUTER_API_KEY"}, //nolint:gosec // G101: a variable name, not a credential
+		{ //nolint:gosec // G101: apiKeyEnv is a variable name, not a credential
+			agent: reviewsettings.ReviewAgentKindFantasy, baseURL: "", apiKeyEnv: "LITELLM_API_KEY",
+			newProvider: newOpenAICompatProvider, callOptions: liteLLMCallOptions,
+		},
+		{ //nolint:gosec // G101: apiKeyEnv is a variable name, not a credential
+			agent: reviewsettings.ReviewAgentKindOpenAI, baseURL: "https://api.openai.com/v1", apiKeyEnv: "OPENAI_API_KEY",
+			newProvider: newOpenAICompatProvider, callOptions: openAICallOptions,
+		},
+		{ //nolint:gosec // G101: apiKeyEnv is a variable name, not a credential
+			agent: reviewsettings.ReviewAgentKindOpenRouter, baseURL: "https://openrouter.ai/api/v1", apiKeyEnv: "OPENROUTER_API_KEY",
+			newProvider: newOpenAICompatProvider, callOptions: openAICallOptions,
+		},
+		{ //nolint:gosec // G101: apiKeyEnv is a variable name, not a credential
+			agent: reviewsettings.ReviewAgentKindAnthropic, baseURL: "https://api.anthropic.com", apiKeyEnv: "ANTHROPIC_API_KEY",
+			newProvider: newAnthropicProvider, callOptions: anthropicCallOptions,
+		},
 	}
+}
+
+func newOpenAICompatProvider(baseURL, apiKey string) (fantasy.Provider, error) {
+	return openaicompat.New(openaicompat.WithBaseURL(baseURL), openaicompat.WithAPIKey(apiKey))
+}
+
+func newAnthropicProvider(baseURL, apiKey string) (fantasy.Provider, error) {
+	return anthropic.New(anthropic.WithBaseURL(baseURL), anthropic.WithAPIKey(apiKey))
+}
+
+func liteLLMCallOptions(promptCacheKey string) review.FantasyCallOptions {
+	return review.OpenAICompatCallOptions(promptCacheKey, true)
+}
+
+func openAICallOptions(promptCacheKey string) review.FantasyCallOptions {
+	return review.OpenAICompatCallOptions(promptCacheKey, false)
+}
+
+func anthropicCallOptions(string) review.FantasyCallOptions {
+	return review.AnthropicCallOptions()
 }
 
 func usageTokens(usage fantasy.Usage) string {

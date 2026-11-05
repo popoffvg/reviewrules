@@ -1,6 +1,6 @@
 {
   "name": "reviewrules",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Run reviewrules on a git diff and act on its verdicts; write an agent plugin for it; find the rules a linter can check.",
   "author": { "name": "Vitalii Popov" },
   "homepage": "https://github.com/popoffvg/reviewrules",

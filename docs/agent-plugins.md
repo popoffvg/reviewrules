@@ -11,7 +11,7 @@ reviewrules runs `reviewrules-agent-<name> start-parent|fork|append` with one JS
 
 The key `agent` in the user config selects the backend. There is no command-line flag for it. reviewrules looks up the name in this order:
 
-1. an API backend: `openai`, `openrouter`, or `fantasy`;
+1. an API backend: `openai`, `openrouter`, `anthropic`, or `fantasy`;
 2. a built-in plugin: `codex` or `claude`;
 3. the exec plugin `<plugin_dir>/reviewrules-agent-<name>`.
 

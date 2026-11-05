@@ -17,6 +17,8 @@ type ModelTokenPrice struct {
 // DefaultModelTokenPrices lists the per-token prices the cost estimate uses when no prices table of the
 // user config replaces them. Prices change; check them before you rely on the estimate.
 func DefaultModelTokenPrices() map[string]ModelTokenPrice {
+	haiku := ModelTokenPrice{Input: 0.10, CachedInput: 0.01, Output: 0.50}
+	sonnet := ModelTokenPrice{Input: 2.00, CachedInput: 0.20, Output: 10.00}
 	return map[string]ModelTokenPrice{
 		"gpt-6-luna":  {Input: 0.10, CachedInput: 0.01, Output: 0.50},
 		"gpt-6.1-sol": {Input: 2.00, CachedInput: 0.10, Output: 10.00},
@@ -24,8 +26,12 @@ func DefaultModelTokenPrices() map[string]ModelTokenPrice {
 		"openai/gpt-6-luna":  {Input: 0.10, CachedInput: 0.01, Output: 0.50},
 		"openai/gpt-6.1-sol": {Input: 2.00, CachedInput: 0.10, Output: 10.00},
 		// claude aliases resolve to Claude Haiku 5.5 and Sonnet 5.5; cache writes are not priced here.
-		"haiku":  {Input: 0.10, CachedInput: 0.01, Output: 0.50},
-		"sonnet": {Input: 2.00, CachedInput: 0.20, Output: 10.00},
+		"haiku":  haiku,
+		"sonnet": sonnet,
+		// The anthropic backend takes full model ids.
+		"claude-haiku-5-5":  haiku,
+		"claude-sonnet-5-5": sonnet,
+		"claude-opus-5-5":   {Input: 4.00, CachedInput: 0.20, Output: 20.00},
 	}
 }
 

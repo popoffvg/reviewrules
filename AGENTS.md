@@ -26,7 +26,7 @@ reviewrules reviews a git diff against the rules in `.reviewrules/` and in the e
 
 ## Agent plugins
 
-The backend is `ReviewForkAgent`. The API backends `openai`, `openrouter`, and `fantasy` are in the core (`review.FantasyForkAgent`) and are not plugins. Every other agent is a plugin.
+The backend is `ReviewForkAgent`. The API backends `openai`, `openrouter`, `anthropic`, and `fantasy` are in the core (`review.FantasyForkAgent`) and are not plugins. Every other agent is a plugin.
 
 ### Lookup
 
@@ -47,7 +47,7 @@ The user doc is [docs/agent-plugins.md](docs/agent-plugins.md). The protocol and
 
 - **Exec plugin** (any language, no reviewrules change): follow `coding-agent-plugin/skills/create-agent-plugin/SKILL.md`.
 - **Built-in plugin**: add a package `internal/agentplugin/<name>plugin` with a type that implements `agentplugin.AgentPlugin`, add the name to `reviewsettings.ReviewAgentKind`, and add one row to `builtinAgentPlugins()` in `main.go`.
-- **API backend** (OpenAI-compatible endpoint): add one row to `reviewEndpoints()` in `main.go`.
+- **API backend** (a fantasy provider): add one row to `reviewEndpoints()` in `main.go` with its provider constructor and its `review.FantasyCallOptions`.
 
 ### Exec plugins in this repo
 

@@ -14,7 +14,7 @@ reviewrules checks a git diff against the rules in `.reviewrules/` at the repo r
 3. **Pick the backend.** Use the first that works on this machine, and set it as `agent` in the `[local]` case of the user config:
    - `codex` when `codex login status` shows a login;
    - `claude` when the `claude` binary is logged in or `ANTHROPIC_API_KEY` is set (also set `model = "haiku"`, `hypothesis_model = "opus"`, `hypothesis_check_model = "sonnet"`);
-   - `openai` with `OPENAI_API_KEY`, or `openrouter` with `OPENROUTER_API_KEY`;
+   - `openai` with `OPENAI_API_KEY`, `openrouter` with `OPENROUTER_API_KEY`, or `anthropic` with `ANTHROPIC_API_KEY`;
    - `fantasy` only when a LiteLLM proxy runs at `base_url`.
 
    Do not edit the operator's own `~/.config/reviewrules/config.toml` without asking: write a new file and pass it with `--config`. Done when `reviewrules --print-config` shows the `agent` you picked and exits with code 0.

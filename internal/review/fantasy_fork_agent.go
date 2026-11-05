@@ -10,21 +10,17 @@ import (
 	"sync"
 
 	"charm.land/fantasy"
-	"charm.land/fantasy/providers/openai"
-	"charm.land/fantasy/providers/openaicompat"
 	"github.com/popoffvg/reviewrules/internal/prompts"
 )
 
 var _ ReviewForkAgent = (*FantasyForkAgent)(nil)
 
-// FantasyForkAgent runs the review through Fantasy on an OpenAI-compatible endpoint, a LiteLLM
-// proxy in practice. A fork is a new call whose Messages are the parent's history.
+// FantasyForkAgent runs the review through Fantasy on an API backend: an OpenAI-compatible
+// endpoint or the Anthropic API. A fork is a new call whose Messages are the parent's history.
 type FantasyForkAgent struct {
 	provider       fantasy.Provider
 	repoRoot       string
-	promptCacheKey string
-	// liteLLMSession sends litellm_session_id, which only a LiteLLM proxy accepts.
-	liteLLMSession bool
+	callOptions    FantasyCallOptions
 	systemPrompt   string
 	lastStepAnswer string
 
@@ -34,14 +30,11 @@ type FantasyForkAgent struct {
 	forks   map[string][]fantasy.Message
 }
 
-// NewFantasyForkAgent builds the agent. promptCacheKey names the provider cache for this run;
-// every call of the run sends it, so forks find the parent's prefix. Set liteLLMSession only for
-// a LiteLLM proxy: OpenAI rejects the unknown litellm_session_id field.
+// NewFantasyForkAgent builds the agent. callOptions gives the provider options of every call of the run.
 func NewFantasyForkAgent(
 	provider fantasy.Provider,
 	repoRoot string,
-	promptCacheKey string,
-	liteLLMSession bool,
+	callOptions FantasyCallOptions,
 	text prompts.Set,
 ) *FantasyForkAgent {
 	if text.ReviewSystem == "" {
@@ -50,8 +43,7 @@ func NewFantasyForkAgent(
 	return &FantasyForkAgent{
 		provider:       provider,
 		repoRoot:       repoRoot,
-		promptCacheKey: promptCacheKey,
-		liteLLMSession: liteLLMSession,
+		callOptions:    callOptions,
 		systemPrompt:   text.ReviewSystem,
 		lastStepAnswer: text.LastStepAnswer,
 		agents:         map[ForkSettings]fantasy.Agent{},
@@ -76,8 +68,9 @@ func (a *FantasyForkAgent) StartParentSession(
 		return fantasy.Usage{}, err
 	}
 	result, err := agent.Generate(ctx, fantasy.AgentCall{
-		Prompt:   prompt,
-		StopWhen: []fantasy.StopCondition{fantasy.StepCountIs(settings.MaxSteps)},
+		Prompt:      prompt,
+		StopWhen:    []fantasy.StopCondition{fantasy.StepCountIs(settings.MaxSteps)},
+		PrepareStep: cacheEachStep,
 	})
 	if err != nil {
 		return fantasy.Usage{}, fmt.Errorf("parent session failed: %w", err)
@@ -177,41 +170,36 @@ func (a *FantasyForkAgent) agentFor(ctx context.Context, settings ForkSettings) 
 	if err != nil {
 		return nil, fmt.Errorf("fantasy model %q setup failed: %w", settings.Model, err)
 	}
-	// LiteLLM's chatgpt provider drops prompt_cache_key and sends a new random session_id
-	// header per call unless litellm_session_id is set; the ChatGPT backend caches per session.
-	options := &openaicompat.ProviderOptions{
-		ExtraBody: map[string]any{"prompt_cache_key": a.promptCacheKey},
-	}
-	if a.liteLLMSession {
-		options.ExtraBody["litellm_session_id"] = a.promptCacheKey
-	}
-	if settings.ReasoningEffort != "" {
-		effort := openai.ReasoningEffort(settings.ReasoningEffort)
-		options.ReasoningEffort = &effort
-	}
-	agent := fantasy.NewAgent(
-		model,
+	agentOptions := []fantasy.AgentOption{
 		fantasy.WithSystemPrompt(a.systemPrompt),
 		fantasy.WithTools(NewRepoReadTools(a.repoRoot)...),
-		fantasy.WithProviderOptions(fantasy.ProviderOptions{openaicompat.Name: options}),
-	)
+	}
+	agent := fantasy.NewAgent(model, append(agentOptions, a.callOptions(settings)...)...)
 	a.agents[key] = agent
 	return agent, nil
 }
 
+// cacheEachStep moves the cache breakpoint to the end of each step's request.
+func cacheEachStep(
+	ctx context.Context,
+	options fantasy.PrepareStepFunctionOptions,
+) (context.Context, fantasy.PrepareStepResult, error) {
+	return ctx, fantasy.PrepareStepResult{Messages: withCacheBreakpoint(options.Messages)}, nil
+}
+
 // answerOnLastStep forbids tool calls on the last allowed step, so a fork that spent its
 // steps on reading still ends with a text answer. ToolChoiceNone keeps the tool list in
-// the request, so the cached prefix still matches.
+// the request, so the cached prefix still matches. Every step gets the cache breakpoint.
 func (a *FantasyForkAgent) answerOnLastStep(maxSteps int) fantasy.PrepareStepFunction {
 	return func(
 		ctx context.Context,
 		options fantasy.PrepareStepFunctionOptions,
 	) (context.Context, fantasy.PrepareStepResult, error) {
 		if options.StepNumber < maxSteps-1 {
-			return ctx, fantasy.PrepareStepResult{}, nil
+			return cacheEachStep(ctx, options)
 		}
 		none := fantasy.ToolChoiceNone
 		messages := append(slices.Clone(options.Messages), fantasy.NewUserMessage(a.lastStepAnswer))
-		return ctx, fantasy.PrepareStepResult{ToolChoice: &none, Messages: messages}, nil
+		return ctx, fantasy.PrepareStepResult{ToolChoice: &none, Messages: withCacheBreakpoint(messages)}, nil
 	}
 }

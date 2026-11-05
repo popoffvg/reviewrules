@@ -28,6 +28,8 @@ const (
 	ReviewAgentKindOpenAI ReviewAgentKind = "openai"
 	// ReviewAgentKindOpenRouter calls OpenRouter directly with OPENROUTER_API_KEY.
 	ReviewAgentKindOpenRouter ReviewAgentKind = "openrouter"
+	// ReviewAgentKindAnthropic calls the Anthropic API directly with ANTHROPIC_API_KEY.
+	ReviewAgentKindAnthropic ReviewAgentKind = "anthropic"
 )
 
 // UserConfigCase selects the table of the user config.
@@ -43,8 +45,8 @@ const (
 // LiteLLM model names for fantasy, claude model aliases for claude, codex model ids for codex.
 // The toml, description, and default-text tags of a field make its ConfigKey row.
 type UserConfig struct {
-	Agent                ReviewAgentKind                   `toml:"agent"                  description:"backend: fantasy (LiteLLM endpoint), openai or openrouter (direct API), claude or codex (built-in plugins), or an exec plugin name"`
-	BaseURL              string                            `toml:"base_url"               description:"endpoint for fantasy; for openai and openrouter only when it differs from the default LiteLLM URL"`
+	Agent                ReviewAgentKind                   `toml:"agent"                  description:"backend: fantasy (LiteLLM endpoint), openai, openrouter, or anthropic (direct API), claude or codex (built-in plugins), or an exec plugin name"`
+	BaseURL              string                            `toml:"base_url"               description:"endpoint for fantasy; for openai, openrouter, and anthropic only when it differs from the default LiteLLM URL"`
 	Model                string                            `toml:"model"                  description:"model for the parent session, the rule forks, and the hypothesis checkers"`
 	HypothesisModel      string                            `toml:"hypothesis_model"       description:"model that writes the correctness hypotheses"`
 	HypothesisCheckModel string                            `toml:"hypothesis_check_model" description:"model that answers each hypothesis; empty uses model"                                                                        default-text:"model"`
