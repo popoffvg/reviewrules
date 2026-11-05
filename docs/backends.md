@@ -12,7 +12,7 @@ Set `agent` in the user config (see [Configuration](configuration.md)). All back
 | `fantasy` | a LiteLLM proxy at `base_url` | `LITELLM_API_KEY` | the proxy's model names |
 | `<name>` | the exec plugin `reviewrules-agent-<name>` in `plugin_dir` | what the plugin needs | what the plugin accepts |
 
-Use `fantasy` for a LiteLLM proxy. The proxy route can use a ChatGPT subscription; the built-in `codex` backend uses the local CLI login directly. With an API key, `openai`, `openrouter`, or `anthropic` needs no proxy. The `anthropic` backend marks the end of each request as a prompt cache breakpoint, so the forks read the parent prefix from the cache. See [LiteLLM setup](litellm.md).
+Use `fantasy` for a LiteLLM proxy. The proxy route can use a ChatGPT subscription; the built-in `codex` backend uses the local CLI login directly. With an API key, `openai`, `openrouter`, or `anthropic` needs no proxy. For an Anthropic key that no workspace scopes, set `ANTHROPIC_WORKSPACE_ID`; the `anthropic` backend sends it as the `anthropic-workspace-id` header. The `anthropic` backend marks the end of each request as a prompt cache breakpoint, so the forks read the parent prefix from the cache. See [LiteLLM setup](litellm.md).
 
 To add a different agent, see [agent plugins](agent-plugins.md).
 

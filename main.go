@@ -281,8 +281,14 @@ func newOpenAICompatProvider(baseURL, apiKey string) (fantasy.Provider, error) {
 	return openaicompat.New(openaicompat.WithBaseURL(baseURL), openaicompat.WithAPIKey(apiKey))
 }
 
+// newAnthropicProvider sends ANTHROPIC_WORKSPACE_ID as the anthropic-workspace-id header when it is set:
+// the API rejects a key that no workspace scopes unless the request names one.
 func newAnthropicProvider(baseURL, apiKey string) (fantasy.Provider, error) {
-	return anthropic.New(anthropic.WithBaseURL(baseURL), anthropic.WithAPIKey(apiKey))
+	options := []anthropic.Option{anthropic.WithBaseURL(baseURL), anthropic.WithAPIKey(apiKey)}
+	if workspaceID := os.Getenv("ANTHROPIC_WORKSPACE_ID"); workspaceID != "" {
+		options = append(options, anthropic.WithHeaders(map[string]string{"anthropic-workspace-id": workspaceID}))
+	}
+	return anthropic.New(options...)
 }
 
 func liteLLMCallOptions(promptCacheKey string) review.FantasyCallOptions {
