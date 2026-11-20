@@ -148,7 +148,7 @@ Write `plugin_dir` and `prompts_dir` as absolute paths: reviewrules does not exp
 | `review_system.md` | the system prompt of every call |
 | `parent_session.md.tmpl` | the parent session |
 | `rule_check.md.tmpl` | one rule check |
-| `hypothesis_generator.md` | the hypothesis list |
+| `hypothesis_generator.md.tmpl` | the hypothesis list |
 | `hypothesis_check.md.tmpl` | one hypothesis check |
 | `json_only_retry.md` | the retry when a reply has no JSON block |
 | `last_step_answer.md` | the last tool step of an API backend |

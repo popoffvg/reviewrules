@@ -12,7 +12,8 @@ func TestLoadEmptyDirKeepsEmbeddedPrompts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if set.ReviewSystem != ReviewSystem || set.HypothesisGenerator != HypothesisGenerator {
+	generator := HypothesisGeneratorInput{MaxHypotheses: 7}
+	if set.ReviewSystem != ReviewSystem || set.HypothesisGenerator(generator) != HypothesisGenerator(generator) {
 		t.Fatal("empty prompts_dir changed an embedded prompt")
 	}
 	got := set.RuleCheck(RuleCheckInput{ID: "r1", Severity: "high", Text: "do the thing"})
@@ -70,6 +71,16 @@ func TestLoadRejectsUnknownEmptyAndBrokenFiles(t *testing.T) {
 			t.Fatalf("error = %v; want prompts_dir", err)
 		}
 	})
+}
+
+func TestHypothesisGeneratorAsksForTheGivenMaximum(t *testing.T) {
+	input := HypothesisGeneratorInput{MaxHypotheses: 7}
+
+	prompt := HypothesisGenerator(input)
+
+	if !strings.Contains(prompt, "At most 7.") {
+		t.Errorf("hypothesis generator prompt has no %q:\n%s", "At most 7.", prompt)
+	}
 }
 
 func writePromptFile(t *testing.T, dir string, name string, text string) {

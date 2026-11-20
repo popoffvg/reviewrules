@@ -2,7 +2,6 @@ package review
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"testing"
 
@@ -96,6 +95,20 @@ func TestRecheckSendsTheUndecidedReason(t *testing.T) {
 	}
 }
 
+func TestRecheckOfAnUnsureRowWithNoEvidenceStillGetsTheLastCheckPrompt(t *testing.T) {
+	agent := &promptRecordingForkAgent{scriptForkAgent: scriptForkAgent{text: `{"verdicts": [{"id": "H1", "verdict": "REFUTED", "evidence": ["b.go:7 — return — no defect"]}]}`}}
+	undecided := HypothesisCheck{
+		Hypothesis: Hypothesis{ID: "H1", At: "a.go:1", Question: "Does a nil token ack every notification?"},
+		Verdict:    HypothesisVerdictUnsure,
+	}
+
+	RecheckUndecidedHypothesis(t.Context(), agent, ForkSettings{}, undecided, prompts.Default())
+
+	if !strings.Contains(agent.prompt, "This is the last check.") {
+		t.Fatalf("prompt has no last-check instructions:\n%s", agent.prompt)
+	}
+}
+
 // promptRecordingForkAgent keeps the last ledger prompt.
 type promptRecordingForkAgent struct {
 	scriptForkAgent
@@ -126,14 +139,4 @@ func (a scriptForkAgent) ForkHypothesisLedger(ctx context.Context, prompt string
 
 func (a scriptForkAgent) AppendToFork(context.Context, string, string, ForkSettings) (ForkReply, error) {
 	return ForkReply{}, context.Canceled
-}
-
-func TestHypothesisGeneratorPromptAsksForTheEnforcedMaximum(t *testing.T) {
-	want := fmt.Sprintf("At most %d.", maxHypotheses)
-
-	prompt := prompts.HypothesisGenerator
-
-	if !strings.Contains(prompt, want) {
-		t.Errorf("hypothesis generator prompt has no %q; the prompt and maxHypotheses must agree", want)
-	}
 }

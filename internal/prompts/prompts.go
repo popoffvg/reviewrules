@@ -18,9 +18,6 @@ var promptFiles embed.FS
 // search tools (read_file/grep/list_dir, Read/Grep/Glob, or a read-only shell).
 var ReviewSystem = promptText("review_system.md")
 
-// HypothesisGenerator asks a fork to write correctness hypotheses, not to answer them.
-var HypothesisGenerator = promptText("hypothesis_generator.md")
-
 // JSONOnlyRetry asks a fork again for the JSON block its last reply did not have.
 var JSONOnlyRetry = promptText("json_only_retry.md")
 
@@ -28,9 +25,10 @@ var JSONOnlyRetry = promptText("json_only_retry.md")
 var LastStepAnswer = promptText("last_step_answer.md")
 
 var (
-	parentSessionTemplate   = promptTemplate("parent_session.md.tmpl")
-	ruleCheckTemplate       = promptTemplate("rule_check.md.tmpl")
-	hypothesisCheckTemplate = promptTemplate("hypothesis_check.md.tmpl")
+	hypothesisGeneratorTemplate = promptTemplate("hypothesis_generator.md.tmpl")
+	parentSessionTemplate       = promptTemplate("parent_session.md.tmpl")
+	ruleCheckTemplate           = promptTemplate("rule_check.md.tmpl")
+	hypothesisCheckTemplate     = promptTemplate("hypothesis_check.md.tmpl")
 )
 
 // ConventionDoc is one convention doc the parent prompt quotes in full.
@@ -64,6 +62,11 @@ type RuleCheckInput struct {
 	Text     string
 }
 
+// HypothesisGeneratorInput is the cap on the hypotheses one generator fork writes.
+type HypothesisGeneratorInput struct {
+	MaxHypotheses int
+}
+
 // HypothesisCheckInput is the ledger one checker fork answers.
 type HypothesisCheckInput struct {
 	Hypotheses []HypothesisCheckItem
@@ -82,13 +85,13 @@ type HypothesisCheckItem struct {
 
 // Set is the prompt text of one run. Default is the embedded text. Load replaces a file that prompts_dir holds.
 type Set struct {
-	ReviewSystem        string
-	HypothesisGenerator string
-	JSONOnlyRetry       string
-	LastStepAnswer      string
-	parent              *template.Template
-	rule                *template.Template
-	hypothesis          *template.Template
+	ReviewSystem   string
+	JSONOnlyRetry  string
+	LastStepAnswer string
+	generator      *template.Template
+	parent         *template.Template
+	rule           *template.Template
+	hypothesis     *template.Template
 }
 
 // Default is the embedded prompt text.
@@ -97,19 +100,19 @@ func Default() Set {
 }
 
 var defaultSet = Set{
-	ReviewSystem:        ReviewSystem,
-	HypothesisGenerator: HypothesisGenerator,
-	JSONOnlyRetry:       JSONOnlyRetry,
-	LastStepAnswer:      LastStepAnswer,
-	parent:              parentSessionTemplate,
-	rule:                ruleCheckTemplate,
-	hypothesis:          hypothesisCheckTemplate,
+	ReviewSystem:   ReviewSystem,
+	JSONOnlyRetry:  JSONOnlyRetry,
+	LastStepAnswer: LastStepAnswer,
+	generator:      hypothesisGeneratorTemplate,
+	parent:         parentSessionTemplate,
+	rule:           ruleCheckTemplate,
+	hypothesis:     hypothesisCheckTemplate,
 }
 
 // Prompt file names a prompts_dir entry must use. A different name is an error.
 const (
 	FileReviewSystem        = "review_system.md"
-	FileHypothesisGenerator = "hypothesis_generator.md"
+	FileHypothesisGenerator = "hypothesis_generator.md.tmpl"
 	FileJSONOnlyRetry       = "json_only_retry.md"
 	FileLastStepAnswer      = "last_step_answer.md"
 	FileParentSession       = "parent_session.md.tmpl"
@@ -152,7 +155,7 @@ func Load(dir string) (Set, error) {
 		case FileReviewSystem:
 			set.ReviewSystem = text
 		case FileHypothesisGenerator:
-			set.HypothesisGenerator = text
+			set.generator, err = parsePromptTemplate(name, text)
 		case FileJSONOnlyRetry:
 			set.JSONOnlyRetry = text
 		case FileLastStepAnswer:
@@ -191,6 +194,16 @@ func RuleCheck(input RuleCheckInput) string {
 // RuleCheck renders this set's rule prompt.
 func (s Set) RuleCheck(input RuleCheckInput) string {
 	return render(s.rule, input)
+}
+
+// HypothesisGenerator asks a fork to write at most input.MaxHypotheses correctness hypotheses, not to answer them.
+func HypothesisGenerator(input HypothesisGeneratorInput) string {
+	return Default().HypothesisGenerator(input)
+}
+
+// HypothesisGenerator renders this set's hypothesis generator prompt.
+func (s Set) HypothesisGenerator(input HypothesisGeneratorInput) string {
+	return render(s.generator, input)
 }
 
 // HypothesisCheck asks a fork to answer one hypothesis with quoted evidence.

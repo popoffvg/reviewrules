@@ -63,7 +63,8 @@ func GenerateHypothesesInFork(
 	settings ForkSettings,
 	text prompts.Set,
 ) ([]Hypothesis, fantasy.Usage, error) {
-	fork, err := agent.ForkParentSession(ctx, text.HypothesisGenerator, settings)
+	prompt := text.HypothesisGenerator(prompts.HypothesisGeneratorInput{MaxHypotheses: maxHypotheses})
+	fork, err := agent.ForkParentSession(ctx, prompt, settings)
 	if err != nil {
 		return nil, fantasy.Usage{}, fmt.Errorf("hypothesis generator fork failed: %w", err)
 	}
@@ -197,6 +198,9 @@ func (c HypothesisCheck) UndecidedReason() string {
 	parts := slices.Clone(c.Evidence)
 	if c.Error != "" {
 		parts = append(parts, c.Error)
+	}
+	if len(parts) == 0 {
+		return "the first check gave no evidence and no error"
 	}
 	return strings.Join(parts, "; ")
 }

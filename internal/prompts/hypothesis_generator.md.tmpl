@@ -18,7 +18,7 @@ Walk these hunts over every hunk:
 Walk every hunt before you answer. Look for an input that makes the changed code give a wrong result.
 Do not stop because nothing looks suspect, and do not return an empty list.
 Each place the code may be wrong becomes one yes/no question whose YES is a defect.
-At most 12. Prefer a silent wrong result over a loud failure. Merge two questions about one code path.
+At most {{.MaxHypotheses}}. Prefer a silent wrong result over a loud failure. Merge two questions about one code path.
 Use only the diff already in the conversation. Do not open a file. Do not answer the questions; other agents will.
 Reply with one json block and nothing else.
 
