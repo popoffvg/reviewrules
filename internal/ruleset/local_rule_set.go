@@ -1,7 +1,9 @@
 package ruleset
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -28,9 +30,12 @@ func LocalRuleSets(repoRoot string, ruleDirs map[string]string) (checkouts []Rul
 			return nil, nil, fmt.Errorf("rule dir path invalid: rule_dirs.%s: %w", name, resolveErr)
 		}
 		_, statErr := os.Stat(filepath.Join(dir, ".reviewrules", "config.json"))
-		if statErr != nil {
+		if errors.Is(statErr, fs.ErrNotExist) {
 			skipped = append(skipped, dir)
 			continue
+		}
+		if statErr != nil {
+			return nil, nil, fmt.Errorf("rule dir read failed: rule_dirs.%s: %w", name, statErr)
 		}
 		checkouts = append(checkouts, RuleSetCheckout{
 			RuleSet: RuleSet{Name: name, URL: "file://" + dir},

@@ -114,31 +114,6 @@ func CheckHypothesesInFork(
 	return checkLedgerInFork(ctx, agent, settings, hypotheses, items, text)
 }
 
-// RecheckUndecidedHypothesis gives one UNSURE check its own checker fork. The prompt row carries
-// what the ledger fork gave, so the fork reads the callers that the ledger fork did not read.
-func RecheckUndecidedHypothesis(
-	ctx context.Context,
-	agent ReviewForkAgent,
-	settings ForkSettings,
-	check HypothesisCheck,
-	text prompts.Set,
-) HypothesisCheck {
-	item := hypothesisCheckItem(check.Hypothesis)
-	item.Undecided = check.UndecidedReason()
-	recheck := checkLedgerInFork(ctx, agent, settings, []Hypothesis{check.Hypothesis}, []prompts.HypothesisCheckItem{item}, text)[0]
-	recheck.Usage = AddUsage(check.Usage, recheck.Usage)
-	return recheck
-}
-
-// UndecidedReason joins the evidence and the error of an UNSURE check: what the fork could not decide.
-func (c HypothesisCheck) UndecidedReason() string {
-	parts := slices.Clone(c.Evidence)
-	if c.Error != "" {
-		parts = append(parts, c.Error)
-	}
-	return strings.Join(parts, "; ")
-}
-
 func hypothesisCheckItem(hypothesis Hypothesis) prompts.HypothesisCheckItem {
 	return prompts.HypothesisCheckItem{
 		ID:       hypothesis.ID,
@@ -199,6 +174,31 @@ func checkLedgerInFork(
 		applyHypothesisVerdict(&checks[index], verdict.hypothesisCheckReply)
 	}
 	return checks
+}
+
+// RecheckUndecidedHypothesis gives one UNSURE check its own checker fork. The prompt row carries
+// what the ledger fork gave, so the fork reads the callers that the ledger fork did not read.
+func RecheckUndecidedHypothesis(
+	ctx context.Context,
+	agent ReviewForkAgent,
+	settings ForkSettings,
+	check HypothesisCheck,
+	text prompts.Set,
+) HypothesisCheck {
+	item := hypothesisCheckItem(check.Hypothesis)
+	item.Undecided = check.UndecidedReason()
+	recheck := checkLedgerInFork(ctx, agent, settings, []Hypothesis{check.Hypothesis}, []prompts.HypothesisCheckItem{item}, text)[0]
+	recheck.Usage = AddUsage(check.Usage, recheck.Usage)
+	return recheck
+}
+
+// UndecidedReason joins the evidence and the error of an UNSURE check: what the fork could not decide.
+func (c HypothesisCheck) UndecidedReason() string {
+	parts := slices.Clone(c.Evidence)
+	if c.Error != "" {
+		parts = append(parts, c.Error)
+	}
+	return strings.Join(parts, "; ")
 }
 
 func applyHypothesisVerdict(check *HypothesisCheck, reply hypothesisCheckReply) {

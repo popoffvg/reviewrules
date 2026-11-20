@@ -2,6 +2,7 @@ package review
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -125,4 +126,14 @@ func (a scriptForkAgent) ForkHypothesisLedger(ctx context.Context, prompt string
 
 func (a scriptForkAgent) AppendToFork(context.Context, string, string, ForkSettings) (ForkReply, error) {
 	return ForkReply{}, context.Canceled
+}
+
+func TestHypothesisGeneratorPromptAsksForTheEnforcedMaximum(t *testing.T) {
+	want := fmt.Sprintf("At most %d.", maxHypotheses)
+
+	prompt := prompts.HypothesisGenerator
+
+	if !strings.Contains(prompt, want) {
+		t.Errorf("hypothesis generator prompt has no %q; the prompt and maxHypotheses must agree", want)
+	}
 }

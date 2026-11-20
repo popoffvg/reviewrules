@@ -24,8 +24,8 @@ reviewrules has five flags and `--print-config` (see the Flags table in `README.
 | `rule_sets` | `.reviewrules/settings.toml` | `[]` | shared rule sets [[rule_sets]] with name, url, ref; each adds the rules of its root .reviewrules/ as &lt;name&gt;/&lt;rule id&gt; |
 | `agent` | `~/.config/reviewrules/config.toml` | `detected` | backend: fantasy (LiteLLM endpoint), openai or openrouter (direct API), claude or codex (built-in plugins), or an exec plugin name; unset picks the one backend found on this machine, and several found fail the run |
 | `base_url` | `~/.config/reviewrules/config.toml` | `"http://localhost:4000/v1"` | endpoint for fantasy; for openai and openrouter only when it differs from the default LiteLLM URL |
-| `model` | `~/.config/reviewrules/config.toml` | `per agent` | model for the parent session, the rule forks, and the hypothesis checkers; unset takes the agent default: gpt-6-luna for the API backends, the CLI default for claude and codex |
-| `hypothesis_model` | `~/.config/reviewrules/config.toml` | `per agent` | model that writes the correctness hypotheses; unset takes the agent default: gpt-6.1-sol for the API backends, the CLI default for claude and codex |
+| `model` | `~/.config/reviewrules/config.toml` | `per agent` | model for the parent session, the rule forks, and the hypothesis checkers; unset takes the agent default: gpt-6-luna for the API backends, sonnet for claude, the CLI default for codex |
+| `hypothesis_model` | `~/.config/reviewrules/config.toml` | `per agent` | model that writes the correctness hypotheses; unset takes the agent default: gpt-6.1-sol for the API backends, sonnet for claude, the CLI default for codex |
 | `hypothesis_check_model` | `~/.config/reviewrules/config.toml` | `model` | model that answers each hypothesis; empty uses model |
 | `reasoning_effort` | `~/.config/reviewrules/config.toml` | `"medium"` | effort for the parent session and the hypothesis forks |
 | `rule_reasoning_effort` | `~/.config/reviewrules/config.toml` | `"high"` | effort for the rule forks; at medium a small model skips checks at random |
@@ -93,7 +93,7 @@ global = "~/.notes"
 
 - Each path is a folder that holds `.reviewrules/config.json` and, if needed, `files.json`. It has the layout of a rule set, and its rule ids get the prefix `<name>/`.
 - A relative path is in the reviewed repo, and `~/` is the home folder. So one user config line gives every repo its own notes.
-- A folder with no `.reviewrules/config.json` is skipped, and the run logs it. A name that a `[[rule_sets]]` entry of the repo settings also has stops the run with exit code 2.
+- A folder with no `.reviewrules/config.json` is skipped, and the run logs it. A rule dir that reviewrules cannot read stops the run with exit code 2. A name that a `[[rule_sets]]` entry of the repo settings also has stops the run with exit code 2.
 - reviewrules reads the folder as it is at run time, with no fetch and no ref.
 - A repo with no `.reviewrules/config.json` of its own still runs when a rule dir or a rule set gives rules. Without both, the run stops with exit code 2.
 
@@ -164,7 +164,7 @@ With no `agent` key in the used case, reviewrules looks for each backend on the 
 
 One backend found: the run uses it, and `--print-config` shows `# detected: <what it found>`. No backend or several backends found: the run stops with exit code 2, and the error names what it found and the user config file to write `agent` to. An exec plugin is never detected; name it in `agent`.
 
-An unset `model` or `hypothesis_model` takes the default of the agent: `gpt-6-luna` and `gpt-6.1-sol` for the API backends, and the CLI's own default for `claude` and `codex`.
+An unset `model` or `hypothesis_model` takes the default of the agent: `gpt-6-luna` and `gpt-6.1-sol` for the API backends, `sonnet` for `claude`, and the CLI.s own default for `codex`.
 
 ### The `[local]` and `[ci]` cases
 

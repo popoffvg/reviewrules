@@ -114,11 +114,10 @@ func runReviewRules() int {
 	if len(skippedRuleDirs) > 0 {
 		logger.Info("reviewrules rule dirs skipped: no .reviewrules/config.json", "dirs", skippedRuleDirs)
 	}
-	for _, local := range localRuleSets {
-		if slices.ContainsFunc(config.Repo.RuleSets, func(set ruleset.RuleSet) bool { return set.Name == local.Name }) {
-			logger.Error("reviewrules rule dir name duplicate: a rule set of the repo settings has the same name", "name", local.Name)
-			return 2
-		}
+	err = checkRuleDirNamesAreFree(config.Repo.RuleSets, localRuleSets)
+	if err != nil {
+		logger.Error("reviewrules rule dir name duplicate", "error", err)
+		return 2
 	}
 	ruleSets = append(ruleSets, localRuleSets...)
 	report, err := review.RunReview(ctx, logger, newAgent, review.ReviewRunConfig{
@@ -180,6 +179,17 @@ func runReviewRules() int {
 	return 0
 }
 
+// checkRuleDirNamesAreFree refuses a rule dir whose name a rule set of the repo settings already has.
+func checkRuleDirNamesAreFree(repoSets ruleset.RuleSetList, ruleDirs []ruleset.RuleSetCheckout) error {
+	for _, ruleDir := range ruleDirs {
+		isTaken := slices.ContainsFunc(repoSets, func(set ruleset.RuleSet) bool { return set.Name == ruleDir.Name })
+		if isTaken {
+			return fmt.Errorf("rule dir name %q is also the name of a rule set of the repo settings", ruleDir.Name)
+		}
+	}
+	return nil
+}
+
 // newReviewForkAgentFactory picks the backend the user config names: an API backend, then a built-in
 // agent plugin, then the exec plugin of that name in the plugin folder.
 func newReviewForkAgentFactory(settings reviewsettings.UserConfig, repoRoot string, text prompts.Set) (review.ReviewForkAgentFactory, error) {
@@ -213,11 +223,14 @@ func cachedRuleSetCommits(cacheDir string, sets ruleset.RuleSetList) map[string]
 }
 
 // builtinAgentPlugin is one row of the agent plugins compiled into reviewrules.
-// The binary column is the CLI the plugin runs; agent detection looks it up in PATH.
+// The binary column is the CLI the plugin runs; agent detection looks it up in PATH. model and
+// hypothesisModel are the defaults when the user config sets none; empty runs the CLI's own default.
 type builtinAgentPlugin struct {
-	agent     reviewsettings.ReviewAgentKind
-	binary    func(settings reviewsettings.UserConfig) string
-	newPlugin func(settings reviewsettings.UserConfig) agentplugin.AgentPlugin
+	agent           reviewsettings.ReviewAgentKind
+	binary          func(settings reviewsettings.UserConfig) string
+	model           string
+	hypothesisModel string
+	newPlugin       func(settings reviewsettings.UserConfig) agentplugin.AgentPlugin
 }
 
 func builtinAgentPlugins() []builtinAgentPlugin {
@@ -232,6 +245,9 @@ func builtinAgentPlugins() []builtinAgentPlugin {
 		{
 			agent:  reviewsettings.ReviewAgentKindClaude,
 			binary: func(s reviewsettings.UserConfig) string { return s.ClaudeBinary },
+			// A named model keeps the cost estimate: the built-in price table has sonnet.
+			model:           "sonnet",
+			hypothesisModel: "sonnet",
 			newPlugin: func(s reviewsettings.UserConfig) agentplugin.AgentPlugin {
 				return claudeplugin.NewClaudeAgentPlugin(s.ClaudeBinary)
 			},

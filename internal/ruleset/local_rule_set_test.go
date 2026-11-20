@@ -43,3 +43,17 @@ func TestLocalRuleSetsResolvesPaths(t *testing.T) {
 		t.Fatalf("err = %v; want the bad name refused", err)
 	}
 }
+
+func TestLocalRuleSetsFailsOnARuleDirItCannotRead(t *testing.T) {
+	repo := t.TempDir()
+	err := os.WriteFile(filepath.Join(repo, "notes"), []byte("a file, not a folder"), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, _, err = LocalRuleSets(repo, map[string]string{"notes": "notes"})
+
+	if err == nil || !strings.Contains(err.Error(), "rule dir read failed: rule_dirs.notes") {
+		t.Fatalf("err = %v; want the unreadable rule dir to stop the run", err)
+	}
+}

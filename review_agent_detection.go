@@ -20,16 +20,17 @@ func machineAgentProbe() reviewAgentProbe {
 }
 
 // detectReviewAgent returns the values of the agent keys that the user config leaves unset. With
-// agent set, they are the default models of that agent. With agent unset, it picks the one backend
-// found on the machine: a built-in plugin binary in PATH, or the API key variable of an endpoint.
-// None found, or several found, is an error that tells the user to set agent in the user config.
+// agent set, they are the default models of that agent, and the machine is not probed. With agent
+// unset, it picks the one backend found on the machine: a built-in plugin binary in PATH, or the API
+// key variable of an endpoint. None found, or several found, is an error that tells the user to set
+// agent in the user config.
 func detectReviewAgent(
 	settings reviewsettings.UserConfig,
 	probe reviewAgentProbe,
 	userConfigPath string,
 	userCase reviewsettings.UserConfigCase,
 ) (reviewsettings.AgentDefaults, error) {
-	candidates := reviewAgentCandidates(settings, probe)
+	candidates := reviewAgentCandidates(settings)
 	if settings.Agent != reviewsettings.ReviewAgentKindUnknown {
 		return chosenAgentDefaults(settings.Agent, candidates), nil
 	}
@@ -38,7 +39,7 @@ func detectReviewAgent(
 	var hints []string
 	for _, candidate := range candidates {
 		hints = append(hints, candidate.missingHint)
-		if candidate.isPresent {
+		if candidate.isOnMachine(probe) {
 			found = append(found, candidate)
 		}
 	}
@@ -69,21 +70,28 @@ func detectReviewAgent(
 // reviewAgentCandidate is one backend that agent detection can find on the machine.
 type reviewAgentCandidate struct {
 	defaults    reviewsettings.AgentDefaults
-	isPresent   bool
+	isOnMachine func(probe reviewAgentProbe) bool
 	presence    string
 	missingHint string
 }
 
 // reviewAgentCandidates turns the built-in plugin rows and the endpoint rows into candidates, in row order.
-func reviewAgentCandidates(settings reviewsettings.UserConfig, probe reviewAgentProbe) []reviewAgentCandidate {
+func reviewAgentCandidates(settings reviewsettings.UserConfig) []reviewAgentCandidate {
 	var candidates []reviewAgentCandidate
 	for _, plugin := range builtinAgentPlugins() {
 		binary := plugin.binary(settings)
-		_, err := probe.lookPath(binary)
 		presence := binary + " in PATH"
 		candidates = append(candidates, reviewAgentCandidate{
-			defaults:    reviewsettings.AgentDefaults{Agent: plugin.agent, Source: "detected: " + presence},
-			isPresent:   err == nil,
+			defaults: reviewsettings.AgentDefaults{
+				Agent:           plugin.agent,
+				Model:           plugin.model,
+				HypothesisModel: plugin.hypothesisModel,
+				Source:          "detected: " + presence,
+			},
+			isOnMachine: func(probe reviewAgentProbe) bool {
+				_, err := probe.lookPath(binary)
+				return err == nil
+			},
 			presence:    presence,
 			missingHint: "install " + binary,
 		})
@@ -97,7 +105,7 @@ func reviewAgentCandidates(settings reviewsettings.UserConfig, probe reviewAgent
 				HypothesisModel: endpoint.hypothesisModel,
 				Source:          "detected: " + presence,
 			},
-			isPresent:   probe.getenv(endpoint.apiKeyEnv) != "",
+			isOnMachine: func(probe reviewAgentProbe) bool { return probe.getenv(endpoint.apiKeyEnv) != "" },
 			presence:    presence,
 			missingHint: "set " + endpoint.apiKeyEnv,
 		})

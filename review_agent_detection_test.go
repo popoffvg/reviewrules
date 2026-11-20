@@ -20,21 +20,48 @@ func TestDetectReviewAgentPicksTheOneBackendOnTheMachine(t *testing.T) {
 		{
 			name:     "only-claude-in-path",
 			binaries: []string{"claude"},
-			want:     reviewsettings.AgentDefaults{Agent: "claude", Source: "detected: claude in PATH"},
+			want:     reviewsettings.AgentDefaults{Agent: "claude", Model: "sonnet", HypothesisModel: "sonnet", Source: "detected: claude in PATH"},
+		},
+		{
+			name:     "only-codex-in-path-runs-the-cli-default-model",
+			binaries: []string{"codex"},
+			want:     reviewsettings.AgentDefaults{Agent: "codex", Source: "detected: codex in PATH"},
 		},
 		{
 			name: "only-litellm-key-set",
 			envs: []string{"LITELLM_API_KEY"},
 			want: reviewsettings.AgentDefaults{Agent: "fantasy", Model: "gpt-6-luna", HypothesisModel: "gpt-6.1-sol", Source: "detected: LITELLM_API_KEY is set"},
 		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			settings := reviewsettings.DefaultUserConfig()
+
+			got, err := detectReviewAgent(settings, fakeAgentProbe(tc.binaries, tc.envs), "/home/me/config.toml", reviewsettings.UserConfigCaseLocal)
+
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != tc.want {
+				t.Errorf("defaults = %+v; want %+v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestDetectReviewAgentGivesTheModelsOfASetAgentWithoutProbing(t *testing.T) {
+	cases := []struct {
+		name  string
+		agent reviewsettings.ReviewAgentKind
+		want  reviewsettings.AgentDefaults
+	}{
 		{
-			name:     "set-agent-skips-detection-and-gives-its-models",
-			agent:    "openai",
-			binaries: []string{"claude", "codex"},
-			want:     reviewsettings.AgentDefaults{Agent: "openai", Model: "gpt-6-luna", HypothesisModel: "gpt-6.1-sol", Source: "default of agent openai"},
+			name:  "api-backend-gets-its-models",
+			agent: "openai",
+			want:  reviewsettings.AgentDefaults{Agent: "openai", Model: "gpt-6-luna", HypothesisModel: "gpt-6.1-sol", Source: "default of agent openai"},
 		},
 		{
-			name:  "set-exec-plugin-agent-has-no-models",
+			name:  "exec-plugin-has-no-models",
 			agent: "pi",
 			want:  reviewsettings.AgentDefaults{Agent: "pi"},
 		},
@@ -43,8 +70,18 @@ func TestDetectReviewAgentPicksTheOneBackendOnTheMachine(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			settings := reviewsettings.DefaultUserConfig()
 			settings.Agent = tc.agent
+			probe := reviewAgentProbe{
+				lookPath: func(file string) (string, error) {
+					t.Errorf("probe looked up %s in PATH for a set agent", file)
+					return "", errors.New("not in PATH")
+				},
+				getenv: func(key string) string {
+					t.Errorf("probe read %s for a set agent", key)
+					return ""
+				},
+			}
 
-			got, err := detectReviewAgent(settings, fakeAgentProbe(tc.binaries, tc.envs), "/home/me/config.toml", reviewsettings.UserConfigCaseLocal)
+			got, err := detectReviewAgent(settings, probe, "/home/me/config.toml", reviewsettings.UserConfigCaseLocal)
 
 			if err != nil {
 				t.Fatal(err)
@@ -84,6 +121,16 @@ func TestDetectReviewAgentFailsWithoutOneChoice(t *testing.T) {
 				t.Errorf("error = %v; want %q", err, tc.wantErr)
 			}
 		})
+	}
+}
+
+func TestWithAgentDefaultsFillsAConfigWithNoSources(t *testing.T) {
+	defaults := reviewsettings.AgentDefaults{Agent: "claude", Model: "sonnet", Source: "detected: claude in PATH"}
+
+	got := reviewsettings.ReviewConfig{}.WithAgentDefaults(defaults)
+
+	if got.User.Agent != "claude" || got.User.Model != "sonnet" {
+		t.Errorf("user config = %+v; want agent claude, model sonnet", got.User)
 	}
 }
 

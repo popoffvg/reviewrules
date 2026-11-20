@@ -88,6 +88,9 @@ type AgentDefaults struct {
 // WithAgentDefaults returns the config with each unset agent key taken from defaults.
 func (c ReviewConfig) WithAgentDefaults(defaults AgentDefaults) ReviewConfig {
 	sources := maps.Clone(c.sources)
+	if sources == nil {
+		sources = map[string]string{}
+	}
 	user := c.User
 	if user.Agent == ReviewAgentKindUnknown {
 		user.Agent = defaults.Agent
