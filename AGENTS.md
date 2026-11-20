@@ -61,7 +61,7 @@ The user doc is [docs/agent-plugins.md](docs/agent-plugins.md). The protocol and
 The tools are pinned in `mise.toml`; the commands are tasks in `Taskfile.yml`.
 
 ```bash
-mise install                           # Go, task, actionlint, zizmor
+mise install                           # Go, task, actionlint, zizmor, changie
 task setup                             # mise install and a pre-push hook that runs `task check`
 task generate                          # README Flags table and docs/configuration.md Config keys table; a test fails when either is stale
 task build
@@ -70,8 +70,18 @@ task lint                              # golangci-lint: gosec, revive, and the r
 task workflows                         # actionlint and zizmor --offline
 task check                             # all of the above, in CI order
 task live                              # pi and opencode plugin tests against the real CLIs
+task changeset                         # add a changelog entry to .changes/unreleased
+task release-notes VERSION=vX.Y.Z      # batch the entries into .changes/vX.Y.Z.md and CHANGELOG.md
 ```
 
 - Run builds, tests, and lint in the background; they take time.
 - `internal/agentplugin/testdata/reviewrules-agent-fixed` is the test exec plugin. Tests set `BG_HOME` to a temp dir, so `launch.Run` writes its task logs there.
 - Code rules: comments only where the code needs clarification; a doc is at most 60 words; a file is named after its concept; a table of similar items is one declarative table plus one reader loop.
+
+## Changelog
+
+Every pull request adds a `.changes/unreleased/*.yaml` entry (`task changeset`) or carries the `skip-changelog` label; the `changelog` job in `.github/workflows/ci.yaml` fails otherwise. Use the label only for a change a user cannot see: CI, tests, refactors, internal docs.
+
+- **Kind**: `Added` for a new key, flag, backend, or behavior; `Changed` for a changed default, key format, or output; `Removed` for a key or flag that is gone; `Fixed` for a bug; `Security` for a credential or sandbox fix. `Changed` and `Removed` break user configs: say in the body what a user rewrites.
+- **Body**: one sentence about what the user of the CLI sees, in their terms: a config key, a flag, an exit code, a report line. Do not name a Go type, a file, or a function.
+- **Release**: `task release-notes VERSION=vX.Y.Z` writes `.changes/vX.Y.Z.md` and `CHANGELOG.md`. Commit both, then tag the commit `vX.Y.Z`; Go modules resolve the tag. Before `v1.0.0`, a breaking change bumps the minor version.

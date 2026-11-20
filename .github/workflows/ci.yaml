@@ -13,6 +13,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # A pull request adds a .changes/unreleased/*.yaml entry, or carries the skip-changelog label.
+  changelog:
+    if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-changelog')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: require a changelog entry
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          added=$(git diff --name-only --diff-filter=A "${BASE_SHA}...${HEAD_SHA}" | grep -E '^\.changes/unreleased/.+\.yaml$' || true)
+          if [ -z "${added}" ]; then
+            echo "::error::No changelog entry. Run 'task changeset' to add a .changes/unreleased/*.yaml file, or add the skip-changelog label."
+            exit 1
+          fi
+          echo "${added}"
+
   test:
     runs-on: ubuntu-latest
     steps:

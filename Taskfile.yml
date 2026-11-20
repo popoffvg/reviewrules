@@ -59,6 +59,17 @@ tasks:
       - task: lint
       - task: workflows
 
+  changeset:
+    desc: Add a changelog entry to .changes/unreleased
+    cmds:
+      - changie new
+
+  release-notes:
+    desc: Move the unreleased entries into .changes/<VERSION>.md and CHANGELOG.md; VERSION=vX.Y.Z, else picked from the entry kinds
+    cmds:
+      - changie batch {{.VERSION | default "auto"}}
+      - changie merge
+
   install:
     desc: Install reviewrules into $(go env GOPATH)/bin
     cmds:
