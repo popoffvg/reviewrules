@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"maps"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -106,6 +107,11 @@ func runReviewRules() int {
 		logger.Error("reviewrules rule set fetch failed", "error", err)
 		return 2
 	}
+	err = checkRuleDirNamesAreFree(config.Repo.RuleSets, userConfig.RuleDirs)
+	if err != nil {
+		logger.Error("reviewrules rule dir name duplicate", "error", err)
+		return 2
+	}
 	localRuleSets, skippedRuleDirs, err := ruleset.LocalRuleSets(root, userConfig.RuleDirs)
 	if err != nil {
 		logger.Error("reviewrules rule dir load failed", "error", err)
@@ -113,11 +119,6 @@ func runReviewRules() int {
 	}
 	if len(skippedRuleDirs) > 0 {
 		logger.Info("reviewrules rule dirs skipped: no .reviewrules/config.json", "dirs", skippedRuleDirs)
-	}
-	err = checkRuleDirNamesAreFree(config.Repo.RuleSets, localRuleSets)
-	if err != nil {
-		logger.Error("reviewrules rule dir name duplicate", "error", err)
-		return 2
 	}
 	ruleSets = append(ruleSets, localRuleSets...)
 	report, err := review.RunReview(ctx, logger, newAgent, review.ReviewRunConfig{
@@ -179,12 +180,13 @@ func runReviewRules() int {
 	return 0
 }
 
-// checkRuleDirNamesAreFree refuses a rule dir whose name a rule set of the repo settings already has.
-func checkRuleDirNamesAreFree(repoSets ruleset.RuleSetList, ruleDirs []ruleset.RuleSetCheckout) error {
-	for _, ruleDir := range ruleDirs {
-		isTaken := slices.ContainsFunc(repoSets, func(set ruleset.RuleSet) bool { return set.Name == ruleDir.Name })
+// checkRuleDirNamesAreFree refuses a rule dir whose name a rule set of the repo settings already has,
+// also when the rule dir folder is missing.
+func checkRuleDirNamesAreFree(repoSets ruleset.RuleSetList, ruleDirs map[string]string) error {
+	for _, name := range slices.Sorted(maps.Keys(ruleDirs)) {
+		isTaken := slices.ContainsFunc(repoSets, func(set ruleset.RuleSet) bool { return set.Name == name })
 		if isTaken {
-			return fmt.Errorf("rule dir name %q is also the name of a rule set of the repo settings", ruleDir.Name)
+			return fmt.Errorf("rule dir name %q is also the name of a rule set of the repo settings", name)
 		}
 	}
 	return nil
@@ -305,13 +307,19 @@ type reviewEndpoint struct {
 	hypothesisModel string
 }
 
+// The default models of every API backend, when the user config sets none.
+const (
+	endpointDefaultModel           = "gpt-6-luna"
+	endpointDefaultHypothesisModel = "gpt-6.1-sol"
+)
+
 // reviewEndpoints lists the OpenAI-compatible backends; an empty baseURL means the settings' base_url.
 func reviewEndpoints() []reviewEndpoint {
 	return []reviewEndpoint{
 		// apiKeyEnv holds the name of an environment variable, not a key.
-		{agent: reviewsettings.ReviewAgentKindFantasy, baseURL: "", apiKeyEnv: "LITELLM_API_KEY", liteLLMSession: true, model: "gpt-6-luna", hypothesisModel: "gpt-6.1-sol"},             //nolint:gosec // G101: a variable name, not a credential
-		{agent: reviewsettings.ReviewAgentKindOpenAI, baseURL: "https://api.openai.com/v1", apiKeyEnv: "OPENAI_API_KEY", model: "gpt-6-luna", hypothesisModel: "gpt-6.1-sol"},            //nolint:gosec // G101: a variable name, not a credential
-		{agent: reviewsettings.ReviewAgentKindOpenRouter, baseURL: "https://openrouter.ai/api/v1", apiKeyEnv: "OPENROUTER_API_KEY", model: "gpt-6-luna", hypothesisModel: "gpt-6.1-sol"}, //nolint:gosec // G101: a variable name, not a credential
+		{agent: reviewsettings.ReviewAgentKindFantasy, baseURL: "", apiKeyEnv: "LITELLM_API_KEY", liteLLMSession: true, model: endpointDefaultModel, hypothesisModel: endpointDefaultHypothesisModel},             //nolint:gosec // G101: a variable name, not a credential
+		{agent: reviewsettings.ReviewAgentKindOpenAI, baseURL: "https://api.openai.com/v1", apiKeyEnv: "OPENAI_API_KEY", model: endpointDefaultModel, hypothesisModel: endpointDefaultHypothesisModel},            //nolint:gosec // G101: a variable name, not a credential
+		{agent: reviewsettings.ReviewAgentKindOpenRouter, baseURL: "https://openrouter.ai/api/v1", apiKeyEnv: "OPENROUTER_API_KEY", model: endpointDefaultModel, hypothesisModel: endpointDefaultHypothesisModel}, //nolint:gosec // G101: a variable name, not a credential
 	}
 }
 

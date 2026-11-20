@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -13,14 +14,10 @@ import (
 // LocalRuleSets turns the rule_dirs table of the user config into rule set checkouts that need no
 // fetch. Each path is a folder that holds .reviewrules/config.json. A path that starts with "~/" is
 // in the home folder, and any other relative path is in repoRoot. A folder with no
-// .reviewrules/config.json is skipped and named in skipped, so a repo without notes still runs.
+// .reviewrules/config.json is skipped and named in skipped, so one user config serves repos with and
+// without notes; a repo with no rules from any source still fails in LoadReviewRules.
 func LocalRuleSets(repoRoot string, ruleDirs map[string]string) (checkouts []RuleSetCheckout, skipped []string, err error) {
-	names := make([]string, 0, len(ruleDirs))
-	for name := range ruleDirs {
-		names = append(names, name)
-	}
-	slices.Sort(names)
-	for _, name := range names {
+	for _, name := range slices.Sorted(maps.Keys(ruleDirs)) {
 		err = checkRuleSetName(name)
 		if err != nil {
 			return nil, nil, fmt.Errorf("rule dir name invalid: rule_dirs.%s: %w", name, err)

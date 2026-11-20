@@ -9,7 +9,7 @@ func TestForkSettingsWithProfile(t *testing.T) {
 		profile ForkSettings
 		want    ForkSettings
 	}{
-		{name: "empty-profile-keeps-base", profile: ForkSettings{}, want: base},
+		{name: "profile-with-no-fields-keeps-the-base-model-effort-and-steps", profile: ForkSettings{}, want: base},
 		{name: "light-lowers-effort", profile: ForkSettings{Model: "haiku", ReasoningEffort: "low"}, want: ForkSettings{Model: "haiku", ReasoningEffort: "low", MaxSteps: 8}},
 		{name: "heavy-adds-steps", profile: ForkSettings{MaxSteps: 16}, want: ForkSettings{Model: "sonnet", ReasoningEffort: "high", MaxSteps: 16}},
 	}
