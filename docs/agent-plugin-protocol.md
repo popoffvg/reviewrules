@@ -260,7 +260,7 @@ The effect of a failed operation on the review:
 | `start-parent` | The review stops. reviewrules exits with code 2. |
 | `fork` or `append` of a rule check | The rule gets the verdict `ERROR` with the error text. This is a warning, not a failure, unless the repo settings set `fail_on_unanswered = true`. |
 | `fork` or `append` of the hypothesis generator | The report shows `hypothesis generator gave no answer`. This is a warning, unless the repo settings set `fail_on_unanswered = true`. |
-| `fork` or `append` of the hypothesis ledger | Every hypothesis gets the verdict `UNSURE` with the error text. A failed check is never a defect. |
+| `fork` or `append` of the hypothesis ledger | Every hypothesis gets the verdict `UNSURE` with the error text, and then a recheck fork of its own. A failed check is never a defect. A hypothesis that the recheck also leaves `UNSURE` fails the review as undecided. |
 
 reviewrules does not run a failed operation again. When the error is temporary (for example a rate limit), the plugin MAY try again itself before it exits.
 

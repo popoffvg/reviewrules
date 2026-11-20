@@ -31,14 +31,16 @@ type RuleFinding struct {
 
 // RuleCheckResult is the outcome of one rule fork.
 type RuleCheckResult struct {
-	RuleID   string               `json:"rule_id"`
-	Severity rulecatalog.Severity `json:"severity"`
-	Verdict  RuleVerdict          `json:"verdict"`
-	Findings []RuleFinding        `json:"findings"`
-	Checks   []RequirementCheck   `json:"checks"`
-	Error    string               `json:"error,omitempty"`
-	RawReply string               `json:"raw_reply,omitempty"`
-	Usage    fantasy.Usage        `json:"usage"`
+	RuleID   string                      `json:"rule_id"`
+	Severity rulecatalog.Severity        `json:"severity"`
+	Profile  rulecatalog.ThinkingProfile `json:"profile"`
+	Model    string                      `json:"model"`
+	Verdict  RuleVerdict                 `json:"verdict"`
+	Findings []RuleFinding               `json:"findings"`
+	Checks   []RequirementCheck          `json:"checks"`
+	Error    string                      `json:"error,omitempty"`
+	RawReply string                      `json:"raw_reply,omitempty"`
+	Usage    fantasy.Usage               `json:"usage"`
 }
 
 // RequirementCheck is the fork's answer for one atomic requirement of a rule.
@@ -65,6 +67,8 @@ func CheckRuleInFork(
 	check := RuleCheckResult{
 		RuleID:   rule.ID,
 		Severity: rule.Severity,
+		Profile:  rule.Profile,
+		Model:    settings.Model,
 		Verdict:  RuleVerdictError,
 		Findings: []RuleFinding{},
 	}

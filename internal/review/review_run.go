@@ -26,10 +26,12 @@ type ReviewRunConfig struct {
 	ReasoningEffort          string
 	// RuleReasoningEffort overrides ReasoningEffort for the rule forks; empty keeps ReasoningEffort.
 	RuleReasoningEffort string
-	Parallel            int
-	ParentMaxSteps      int
-	ForkMaxSteps        int
-	CorrectnessEnabled  bool
+	// RuleProfiles maps a rule's thinking profile to the settings that replace the rule fork settings; a missing profile keeps them.
+	RuleProfiles       map[rulecatalog.ThinkingProfile]ForkSettings
+	Parallel           int
+	ParentMaxSteps     int
+	ForkMaxSteps       int
+	CorrectnessEnabled bool
 	// RuleFolders are the rule folder names that the repo settings add to .reviewrules.
 	RuleFolders []string
 	// RuleSets are the fetched rule sets, in the order of the rule_sets list.
@@ -145,8 +147,8 @@ func RunReview(
 		wait.Go(func() {
 			limit <- struct{}{}
 			defer func() { <-limit }()
-			check := CheckRuleInFork(ctx, agent, ruleSettings, rule, text)
-			logger.Info("review rule fork done", "rule", rule.ID, "verdict", check.Verdict, "usage", check.Usage.String())
+			check := CheckRuleInFork(ctx, agent, ruleSettings.withProfile(cfg.RuleProfiles[rule.Profile]), rule, text)
+			logger.Info("review rule fork done", "rule", rule.ID, "profile", rule.Profile, "model", check.Model, "verdict", check.Verdict, "usage", check.Usage.String())
 			report.Rules[index] = check
 		})
 	}
@@ -171,6 +173,19 @@ func RunReview(
 				checks = CheckHypothesesInFork(ctx, agent, checkSettings, hypotheses, text)
 				<-limit
 				logger.Info("review hypothesis ledger done", "hypotheses", len(checks))
+				var recheck sync.WaitGroup
+				for index := range checks {
+					if checks[index].Verdict != HypothesisVerdictUnsure {
+						continue
+					}
+					recheck.Go(func() {
+						limit <- struct{}{}
+						defer func() { <-limit }()
+						checks[index] = RecheckUndecidedHypothesis(ctx, agent, checkSettings, checks[index], text)
+						logger.Info("review hypothesis recheck done", "hypothesis", checks[index].ID, "verdict", checks[index].Verdict)
+					})
+				}
+				recheck.Wait()
 			}
 			lock.Lock()
 			report.Correctness.HypothesisCheck = checks

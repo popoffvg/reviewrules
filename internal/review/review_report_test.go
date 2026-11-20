@@ -35,7 +35,7 @@ func TestReviewFailed(t *testing.T) {
 		{"unsure-hypothesis", ReviewReport{Correctness: CorrectnessReport{
 			Enabled:         true,
 			HypothesisCheck: []HypothesisCheck{{Verdict: HypothesisVerdictUnsure}},
-		}}, false, false},
+		}}, false, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -66,10 +66,28 @@ func TestReviewFailureReasonsNameTheHypothesis(t *testing.T) {
 	}
 }
 
+func TestReviewFailureReasonsFailAnUndecidedHypothesis(t *testing.T) {
+	report := ReviewReport{Correctness: CorrectnessReport{
+		Enabled: true,
+		HypothesisCheck: []HypothesisCheck{
+			{Hypothesis: Hypothesis{ID: "H4", At: "ack.go:12", Question: "Does a nil token ack every notification?"}, Verdict: HypothesisVerdictUnsure, Evidence: []string{"the caller of ackBelow is in a vendored module"}},
+		},
+	}}
+	reasons := report.ReviewFailureReasons(rulecatalog.SeverityMedium, false)
+	if len(reasons) != 1 {
+		t.Fatalf("reasons = %v, want one for H4", reasons)
+	}
+	for _, part := range []string{"H4", "ack.go:12", "undecided", "vendored module"} {
+		if !strings.Contains(reasons[0], part) {
+			t.Errorf("reason %q does not name %q", reasons[0], part)
+		}
+	}
+}
+
 func TestReviewReportJSONSplitsCorrectnessUsage(t *testing.T) {
 	report := ReviewReport{
 		Model:       "small",
-		RulesUsage:  fantasy.Usage{InputTokens: 1},
+		Rules:       []RuleCheckResult{{Usage: fantasy.Usage{InputTokens: 1}}},
 		Correctness: CorrectnessReport{Usage: fantasy.Usage{InputTokens: 2}},
 	}
 	report.Cost = EstimateReviewCost(report, map[string]ModelTokenPrice{"small": {Input: 1}})

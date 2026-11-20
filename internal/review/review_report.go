@@ -43,8 +43,8 @@ func (r ReviewReport) ReviewFailed(failOn rulecatalog.Severity, failOnUnanswered
 }
 
 // ReviewFailureReasons lists one line per check that fails the run: a FAIL rule at or above
-// failOn, or a CONFIRMED hypothesis with its question and
-// the input that breaks the code. An unanswered check (an ERROR rule or a generator error) is a
+// failOn, a CONFIRMED hypothesis with its question and the input that breaks the code, or a
+// hypothesis that is still UNSURE after its own recheck fork. An unanswered check (an ERROR rule or a generator error) is a
 // warning, because a cheap model sometimes skips the answer format; failOnUnanswered makes it
 // fail under the same severity bar as a FAIL.
 func (r ReviewReport) ReviewFailureReasons(failOn rulecatalog.Severity, failOnUnanswered bool) []string {
@@ -66,6 +66,9 @@ func (r ReviewReport) ReviewFailureReasons(failOn rulecatalog.Severity, failOnUn
 	for _, check := range r.Correctness.HypothesisCheck {
 		if check.Verdict == HypothesisVerdictConfirmed {
 			reasons = append(reasons, fmt.Sprintf("hypothesis %s at %s is confirmed: %s Input that breaks it: %s", check.ID, check.At, check.Question, check.Scenario))
+		}
+		if check.Verdict == HypothesisVerdictUnsure {
+			reasons = append(reasons, fmt.Sprintf("hypothesis %s at %s is undecided after the recheck: %s Missing: %s", check.ID, check.At, check.Question, check.UndecidedReason()))
 		}
 	}
 	return reasons

@@ -61,6 +61,7 @@ type ReviewRule struct {
 	Text     string
 	Scope    []string
 	Severity Severity
+	Profile  ThinkingProfile
 }
 
 // ContextDoc is one entry of a rule folder's files.json: a file that rules refer to.
@@ -100,6 +101,7 @@ type ruleConfigFile struct {
 		Rule     string   `json:"rule"`
 		Scope    []string `json:"scope"`
 		Severity string   `json:"severity"`
+		Profile  string   `json:"profile"`
 	} `json:"rules"`
 }
 
@@ -113,17 +115,20 @@ type ruleFilesFile struct {
 
 // LoadReviewRules reads the rules at the repo root, in every nested folder that git tracks, then in
 // each rule set. Each folder uses its first rule folder: .reviewrules, then ruleFolders in list
-// order. The root needs a rule folder; only its instructions and ignorePatterns are used. Nested
+// order. The root needs a rule folder unless a rule set or a rule dir gives rules; only the root's instructions and ignorePatterns are used. Nested
 // scopes are repo-relative already.
 func LoadReviewRules(ctx context.Context, repoRoot string, ruleFolders []string, ruleSets []ruleset.RuleSetCheckout) (RuleCatalog, error) {
 	var catalog RuleCatalog
-	configDirs, err := listReviewRuleDirs(ctx, repoRoot, ruleFolderNames(ruleFolders))
+	configDirs, hasRoot, err := listReviewRuleDirs(ctx, repoRoot, ruleFolderNames(ruleFolders))
 	if err != nil {
 		return catalog, err
 	}
+	if !hasRoot && len(ruleSets) == 0 {
+		return catalog, fmt.Errorf("review rules not found: %s has no .reviewrules/config.json, and no rule set or rule dir gives rules; rule_folders in .reviewrules/settings.toml adds other folders", repoRoot)
+	}
 	catalog.RuleDirs = configDirs
 	for index, dir := range configDirs {
-		err = loadReviewRuleDir(&catalog, filepath.Join(repoRoot, dir), index == 0)
+		err = loadReviewRuleDir(&catalog, filepath.Join(repoRoot, dir), hasRoot && index == 0)
 		if err != nil {
 			return catalog, err
 		}
@@ -168,15 +173,15 @@ func loadRuleSetRules(catalog *RuleCatalog, checkout ruleset.RuleSetCheckout) er
 	return nil
 }
 
-// listReviewRuleDirs returns the root rule folder first, then one rule folder per nested folder, in path order.
-func listReviewRuleDirs(ctx context.Context, repoRoot string, folderNames []string) ([]string, error) {
+// listReviewRuleDirs returns the root rule folder first, when hasRoot, then one rule folder per nested folder, in path order.
+func listReviewRuleDirs(ctx context.Context, repoRoot string, folderNames []string) (dirs []string, hasRoot bool, err error) {
 	args := []string{"-C", repoRoot, "ls-files", "--"}
 	for _, name := range folderNames {
 		args = append(args, name+"/config.json", ":(glob)**/"+name+"/config.json")
 	}
 	output, err := exec.CommandContext(ctx, "git", args...).Output()
 	if err != nil {
-		return nil, fmt.Errorf("review rules listing failed: %w", err)
+		return nil, false, fmt.Errorf("review rules listing failed: %w", err)
 	}
 	// owner folder -> rule folder names found in it
 	found := map[string]map[string]bool{}
@@ -201,17 +206,17 @@ func listReviewRuleDirs(ctx context.Context, repoRoot string, folderNames []stri
 			found["."][name] = true
 		}
 	}
-	if found["."] == nil {
-		return nil, fmt.Errorf("review rules not found: %s has no .reviewrules/config.json; rule_folders in .reviewrules/settings.toml adds other folders", repoRoot)
-	}
 	slices.Sort(owners)
-	dirs := []string{pickRuleFolder(".", found["."], folderNames)}
+	hasRoot = found["."] != nil
+	if hasRoot {
+		dirs = append(dirs, pickRuleFolder(".", found["."], folderNames))
+	}
 	for _, owner := range owners {
 		if owner != "." {
 			dirs = append(dirs, pickRuleFolder(owner, found[owner], folderNames))
 		}
 	}
-	return dirs, nil
+	return dirs, hasRoot, nil
 }
 
 func pickRuleFolder(owner string, names map[string]bool, folderNames []string) string {
@@ -291,11 +296,16 @@ func appendReviewRules(catalog *RuleCatalog, config ruleConfigFile, idPrefix str
 		if err != nil {
 			return fmt.Errorf("review rule %s: %w", id, err)
 		}
+		profile, err := ParseThinkingProfile(entry.Profile)
+		if err != nil {
+			return fmt.Errorf("review rule %s: %w", id, err)
+		}
 		catalog.Rules = append(catalog.Rules, ReviewRule{
 			ID:       id,
 			Text:     entry.Rule,
 			Scope:    entry.Scope,
 			Severity: severity,
+			Profile:  profile,
 		})
 	}
 	return nil

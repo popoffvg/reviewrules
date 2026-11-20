@@ -82,6 +82,26 @@ func TestLoadReviewRulesDetectsRuleFolder(t *testing.T) {
 		}
 	})
 
+	t.Run("no-root-folder-with-rule-set", func(t *testing.T) {
+		bare := t.TempDir()
+		writeRuleFile(t, bare, "pkg/.reviewrules/config.json", `{"instructions":"nested","rules":[{"id":"nested","rule":"n"}]}`)
+		runGitInRepo(t, bare, "init", "-q")
+		runGitInRepo(t, bare, "add", "-A")
+		global := t.TempDir()
+		writeRuleFile(t, global, ".reviewrules/config.json", `{"rules":[{"id":"shared","rule":"s"}]}`)
+		catalog, err := LoadReviewRules(t.Context(), bare, nil, []ruleset.RuleSetCheckout{{RuleSet: ruleset.RuleSet{Name: "wm"}, Dir: global}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var ids []string
+		for _, rule := range catalog.Rules {
+			ids = append(ids, rule.ID)
+		}
+		if !slices.Equal(ids, []string{"nested", "wm/shared"}) || catalog.Instructions != "" {
+			t.Fatalf("ids = %v, instructions %q; want the nested and the rule set rules, and no root instructions", ids, catalog.Instructions)
+		}
+	})
+
 	t.Run("no-rule-folder", func(t *testing.T) {
 		empty := t.TempDir()
 		runGitInRepo(t, empty, "init", "-q")

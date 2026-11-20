@@ -3,13 +3,15 @@ package review
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strings"
 
 	"charm.land/fantasy"
 	"github.com/popoffvg/reviewrules/internal/prompts"
 )
 
 // maxHypotheses caps the generator's list; the generator prompt states the same cap.
-const maxHypotheses = 10
+const maxHypotheses = 12
 
 // HypothesisVerdict is a checker fork's answer to one hypothesis.
 type HypothesisVerdict string
@@ -105,6 +107,56 @@ func CheckHypothesesInFork(
 	hypotheses []Hypothesis,
 	text prompts.Set,
 ) []HypothesisCheck {
+	items := make([]prompts.HypothesisCheckItem, len(hypotheses))
+	for index, hypothesis := range hypotheses {
+		items[index] = hypothesisCheckItem(hypothesis)
+	}
+	return checkLedgerInFork(ctx, agent, settings, hypotheses, items, text)
+}
+
+// RecheckUndecidedHypothesis gives one UNSURE check its own checker fork. The prompt row carries
+// what the ledger fork gave, so the fork reads the callers that the ledger fork did not read.
+func RecheckUndecidedHypothesis(
+	ctx context.Context,
+	agent ReviewForkAgent,
+	settings ForkSettings,
+	check HypothesisCheck,
+	text prompts.Set,
+) HypothesisCheck {
+	item := hypothesisCheckItem(check.Hypothesis)
+	item.Undecided = check.UndecidedReason()
+	recheck := checkLedgerInFork(ctx, agent, settings, []Hypothesis{check.Hypothesis}, []prompts.HypothesisCheckItem{item}, text)[0]
+	recheck.Usage = AddUsage(check.Usage, recheck.Usage)
+	return recheck
+}
+
+// UndecidedReason joins the evidence and the error of an UNSURE check: what the fork could not decide.
+func (c HypothesisCheck) UndecidedReason() string {
+	parts := slices.Clone(c.Evidence)
+	if c.Error != "" {
+		parts = append(parts, c.Error)
+	}
+	return strings.Join(parts, "; ")
+}
+
+func hypothesisCheckItem(hypothesis Hypothesis) prompts.HypothesisCheckItem {
+	return prompts.HypothesisCheckItem{
+		ID:       hypothesis.ID,
+		Hunt:     hypothesis.Hunt,
+		At:       hypothesis.At,
+		Question: hypothesis.Question,
+		Look:     hypothesis.Look,
+	}
+}
+
+func checkLedgerInFork(
+	ctx context.Context,
+	agent ReviewForkAgent,
+	settings ForkSettings,
+	hypotheses []Hypothesis,
+	items []prompts.HypothesisCheckItem,
+	text prompts.Set,
+) []HypothesisCheck {
 	checks := make([]HypothesisCheck, len(hypotheses))
 	for index, hypothesis := range hypotheses {
 		checks[index] = HypothesisCheck{
@@ -115,16 +167,6 @@ func CheckHypothesesInFork(
 	}
 	if len(hypotheses) == 0 {
 		return checks
-	}
-	items := make([]prompts.HypothesisCheckItem, len(hypotheses))
-	for index, hypothesis := range hypotheses {
-		items[index] = prompts.HypothesisCheckItem{
-			ID:       hypothesis.ID,
-			Hunt:     hypothesis.Hunt,
-			At:       hypothesis.At,
-			Question: hypothesis.Question,
-			Look:     hypothesis.Look,
-		}
 	}
 	prompt := text.HypothesisCheck(prompts.HypothesisCheckInput{Hypotheses: items})
 	fork, err := agent.ForkHypothesisLedger(ctx, prompt, settings, hypotheses)

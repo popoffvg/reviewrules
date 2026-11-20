@@ -12,7 +12,7 @@ func TestEstimateReviewCost(t *testing.T) {
 		Model:           "small",
 		HypothesisModel: "big",
 		ParentUsage:     fantasy.Usage{InputTokens: 1_000_000, CacheReadTokens: 2_000_000},
-		RulesUsage:      fantasy.Usage{InputTokens: 1_000_000, CacheReadTokens: 8_000_000, OutputTokens: 100_000},
+		Rules:           []RuleCheckResult{{Usage: fantasy.Usage{InputTokens: 1_000_000, CacheReadTokens: 8_000_000, OutputTokens: 100_000}}},
 		Correctness: CorrectnessReport{
 			GeneratorUsage: fantasy.Usage{InputTokens: 1_000_000, CacheReadTokens: 0, OutputTokens: 100_000},
 		},
@@ -35,11 +35,23 @@ func TestEstimateReviewCost(t *testing.T) {
 		t.Fatalf("parts = %+v, want parent, rules, correctness", estimate.Parts)
 	}
 
+	t.Run("rule-fork-priced-on-its-profile-model", func(t *testing.T) {
+		heavy := EstimateReviewCost(ReviewReport{
+			Model: "small",
+			Rules: []RuleCheckResult{
+				{Usage: fantasy.Usage{InputTokens: 1_000_000}},
+				{Model: "big", Usage: fantasy.Usage{InputTokens: 1_000_000}},
+			},
+		}, prices)
+		assertCloseUSD(t, "rules", heavy.PerPartUSD[ReviewPartRules], 2.10)
+		assertCloseUSD(t, "big", heavy.PerModelUSD["big"], 2.00)
+	})
+
 	t.Run("unpriced-model-is-listed", func(t *testing.T) {
 		unpriced := EstimateReviewCost(ReviewReport{
 			Model:       "unknown",
 			ParentUsage: fantasy.Usage{InputTokens: 1},
-			RulesUsage:  fantasy.Usage{InputTokens: 1},
+			Rules:       []RuleCheckResult{{Usage: fantasy.Usage{InputTokens: 1}}},
 		}, prices)
 		if len(unpriced.UnpricedModels) != 1 || unpriced.TotalUSD != 0 || unpriced.Parts[0].Priced {
 			t.Fatalf("unpriced estimate = %+v", unpriced)
@@ -59,7 +71,7 @@ func TestEstimateReviewCostPricesChecksAtCheckModel(t *testing.T) {
 		Model:                "small",
 		HypothesisModel:      "big",
 		HypothesisCheckModel: "mid",
-		RulesUsage:           fantasy.Usage{InputTokens: 1_000_000},
+		Rules:                []RuleCheckResult{{Usage: fantasy.Usage{InputTokens: 1_000_000}}},
 		Correctness: CorrectnessReport{
 			GeneratorUsage: fantasy.Usage{InputTokens: 1_000_000},
 			CheckUsage:     fantasy.Usage{InputTokens: 1_000_000},

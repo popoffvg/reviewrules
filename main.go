@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"charm.land/fantasy"
@@ -61,6 +62,12 @@ func runReviewRules() int {
 		logger.Error("reviewrules config load failed", "error", err)
 		return 2
 	}
+	agentDefaults, err := detectReviewAgent(config.User, machineAgentProbe(), options.Config, userCase)
+	if err != nil {
+		logger.Error("reviewrules agent detection failed", "error", err)
+		return 2
+	}
+	config = config.WithAgentDefaults(agentDefaults)
 	ruleSetCacheDir, err := ruleset.RuleSetCacheDir()
 	if err != nil && len(config.Repo.RuleSets) > 0 {
 		logger.Error("reviewrules rule set cache dir failed", "error", err)
@@ -99,6 +106,21 @@ func runReviewRules() int {
 		logger.Error("reviewrules rule set fetch failed", "error", err)
 		return 2
 	}
+	localRuleSets, skippedRuleDirs, err := ruleset.LocalRuleSets(root, userConfig.RuleDirs)
+	if err != nil {
+		logger.Error("reviewrules rule dir load failed", "error", err)
+		return 2
+	}
+	if len(skippedRuleDirs) > 0 {
+		logger.Info("reviewrules rule dirs skipped: no .reviewrules/config.json", "dirs", skippedRuleDirs)
+	}
+	for _, local := range localRuleSets {
+		if slices.ContainsFunc(config.Repo.RuleSets, func(set ruleset.RuleSet) bool { return set.Name == local.Name }) {
+			logger.Error("reviewrules rule dir name duplicate: a rule set of the repo settings has the same name", "name", local.Name)
+			return 2
+		}
+	}
+	ruleSets = append(ruleSets, localRuleSets...)
 	report, err := review.RunReview(ctx, logger, newAgent, review.ReviewRunConfig{
 		RepoRoot:                 root,
 		Base:                     options.Base,
@@ -109,6 +131,7 @@ func runReviewRules() int {
 		HypothesisCheckModelName: userConfig.HypothesisCheckModel,
 		ReasoningEffort:          userConfig.ReasoningEffort,
 		RuleReasoningEffort:      userConfig.RuleReasoningEffort,
+		RuleProfiles:             userConfig.Profiles,
 		RuleFolders:              config.Repo.RuleFolders,
 		RuleSets:                 ruleSets,
 		Parallel:                 userConfig.Parallel,
@@ -190,19 +213,29 @@ func cachedRuleSetCommits(cacheDir string, sets ruleset.RuleSetList) map[string]
 }
 
 // builtinAgentPlugin is one row of the agent plugins compiled into reviewrules.
+// The binary column is the CLI the plugin runs; agent detection looks it up in PATH.
 type builtinAgentPlugin struct {
 	agent     reviewsettings.ReviewAgentKind
+	binary    func(settings reviewsettings.UserConfig) string
 	newPlugin func(settings reviewsettings.UserConfig) agentplugin.AgentPlugin
 }
 
 func builtinAgentPlugins() []builtinAgentPlugin {
 	return []builtinAgentPlugin{
-		{agent: reviewsettings.ReviewAgentKindCodex, newPlugin: func(s reviewsettings.UserConfig) agentplugin.AgentPlugin {
-			return codexplugin.NewCodexAgentPlugin(s.CodexBinary)
-		}},
-		{agent: reviewsettings.ReviewAgentKindClaude, newPlugin: func(s reviewsettings.UserConfig) agentplugin.AgentPlugin {
-			return claudeplugin.NewClaudeAgentPlugin(s.ClaudeBinary)
-		}},
+		{
+			agent:  reviewsettings.ReviewAgentKindCodex,
+			binary: func(s reviewsettings.UserConfig) string { return s.CodexBinary },
+			newPlugin: func(s reviewsettings.UserConfig) agentplugin.AgentPlugin {
+				return codexplugin.NewCodexAgentPlugin(s.CodexBinary)
+			},
+		},
+		{
+			agent:  reviewsettings.ReviewAgentKindClaude,
+			binary: func(s reviewsettings.UserConfig) string { return s.ClaudeBinary },
+			newPlugin: func(s reviewsettings.UserConfig) agentplugin.AgentPlugin {
+				return claudeplugin.NewClaudeAgentPlugin(s.ClaudeBinary)
+			},
+		},
 	}
 }
 
@@ -245,20 +278,24 @@ func newEndpointAgentFactory(
 }
 
 // reviewEndpoint is one row of the OpenAI-compatible backends the fantasy agent code serves.
+// Agent detection finds an endpoint when its apiKeyEnv is set. model and hypothesisModel are the
+// defaults when the user config sets none.
 type reviewEndpoint struct {
-	agent          reviewsettings.ReviewAgentKind
-	baseURL        string
-	apiKeyEnv      string
-	liteLLMSession bool
+	agent           reviewsettings.ReviewAgentKind
+	baseURL         string
+	apiKeyEnv       string
+	liteLLMSession  bool
+	model           string
+	hypothesisModel string
 }
 
 // reviewEndpoints lists the OpenAI-compatible backends; an empty baseURL means the settings' base_url.
 func reviewEndpoints() []reviewEndpoint {
 	return []reviewEndpoint{
 		// apiKeyEnv holds the name of an environment variable, not a key.
-		{agent: reviewsettings.ReviewAgentKindFantasy, baseURL: "", apiKeyEnv: "LITELLM_API_KEY", liteLLMSession: true},             //nolint:gosec // G101: a variable name, not a credential
-		{agent: reviewsettings.ReviewAgentKindOpenAI, baseURL: "https://api.openai.com/v1", apiKeyEnv: "OPENAI_API_KEY"},            //nolint:gosec // G101: a variable name, not a credential
-		{agent: reviewsettings.ReviewAgentKindOpenRouter, baseURL: "https://openrouter.ai/api/v1", apiKeyEnv: "OPENROUTER_API_KEY"}, //nolint:gosec // G101: a variable name, not a credential
+		{agent: reviewsettings.ReviewAgentKindFantasy, baseURL: "", apiKeyEnv: "LITELLM_API_KEY", liteLLMSession: true, model: "gpt-6-luna", hypothesisModel: "gpt-6.1-sol"},             //nolint:gosec // G101: a variable name, not a credential
+		{agent: reviewsettings.ReviewAgentKindOpenAI, baseURL: "https://api.openai.com/v1", apiKeyEnv: "OPENAI_API_KEY", model: "gpt-6-luna", hypothesisModel: "gpt-6.1-sol"},            //nolint:gosec // G101: a variable name, not a credential
+		{agent: reviewsettings.ReviewAgentKindOpenRouter, baseURL: "https://openrouter.ai/api/v1", apiKeyEnv: "OPENROUTER_API_KEY", model: "gpt-6-luna", hypothesisModel: "gpt-6.1-sol"}, //nolint:gosec // G101: a variable name, not a credential
 	}
 }
 
@@ -314,6 +351,9 @@ func printReviewSummary(target *os.File, report review.ReviewReport) {
 			if check.Edit != "" {
 				fmt.Fprintf(&out, "          fix: %s\n", check.Edit)
 			}
+		}
+		if check.Verdict == review.HypothesisVerdictUnsure {
+			fmt.Fprintf(&out, "          missing: %s\n", check.UndecidedReason())
 		}
 	}
 	fmt.Fprintf(&out, "usage: total %s\n", usageTokens(report.TotalUsage))

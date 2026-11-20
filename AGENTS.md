@@ -32,6 +32,8 @@ The backend is `ReviewForkAgent`. The API backends `openai`, `openrouter`, and `
 
 The user config key `agent = "<name>"` selects an API backend row in `reviewEndpoints()` (`main.go`), else a built-in plugin row in `builtinAgentPlugins()` (`main.go`): `codex`, `claude`, else the exec plugin `<plugin_dir>/reviewrules-agent-<name>` (`agentplugin.FindExecAgentPlugin`).
 
+With `agent` unset, `detectReviewAgent` (`review_agent_detection.go`) picks the one row found on the machine: a plugin row's `binary` in `PATH`, or an endpoint row's `apiKeyEnv` set. None or several is an error. An endpoint row's `model` and `hypothesisModel` fill the unset model keys.
+
 ### Built-in and exec plugins
 
 - A built-in plugin implements `agentplugin.AgentPlugin` in-process. It gets the same `PluginRequest` and gives the same `PluginReply` as an exec plugin, with no subprocess for the protocol.

@@ -4,18 +4,19 @@
 package reviewsettings
 
 import (
-	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/popoffvg/reviewrules/internal/review"
+	"github.com/popoffvg/reviewrules/internal/rulecatalog"
 )
 
 // ReviewAgentKind names the backend that runs the parent session and the forks. A name that is not
 // an API backend or a built-in agent plugin selects the exec plugin `reviewrules-agent-<name>` in PluginDir.
 type ReviewAgentKind string
 
-// ReviewAgentKind values; ReviewAgentKindUnknown is the zero value and fails validation.
+// ReviewAgentKind values; ReviewAgentKindUnknown is the zero value: the run detects the agent.
 const (
 	ReviewAgentKindUnknown ReviewAgentKind = ""
 	// ReviewAgentKindFantasy calls an OpenAI-compatible endpoint, a LiteLLM proxy in practice.
@@ -43,21 +44,23 @@ const (
 // LiteLLM model names for fantasy, claude model aliases for claude, codex model ids for codex.
 // The toml, description, and default-text tags of a field make its ConfigKey row.
 type UserConfig struct {
-	Agent                ReviewAgentKind                   `toml:"agent"                  description:"backend: fantasy (LiteLLM endpoint), openai or openrouter (direct API), claude or codex (built-in plugins), or an exec plugin name"`
-	BaseURL              string                            `toml:"base_url"               description:"endpoint for fantasy; for openai and openrouter only when it differs from the default LiteLLM URL"`
-	Model                string                            `toml:"model"                  description:"model for the parent session, the rule forks, and the hypothesis checkers"`
-	HypothesisModel      string                            `toml:"hypothesis_model"       description:"model that writes the correctness hypotheses"`
-	HypothesisCheckModel string                            `toml:"hypothesis_check_model" description:"model that answers each hypothesis; empty uses model"                                                                        default-text:"model"`
-	ReasoningEffort      string                            `toml:"reasoning_effort"       description:"effort for the parent session and the hypothesis forks"`
-	RuleReasoningEffort  string                            `toml:"rule_reasoning_effort"  description:"effort for the rule forks; at medium a small model skips checks at random"`
-	Parallel             int                               `toml:"parallel"               description:"forks running at the same time"`
-	ParentSteps          int                               `toml:"parent_steps"           description:"tool-call steps for the parent session"`
-	ForkSteps            int                               `toml:"fork_steps"             description:"tool-call steps for each fork (not used by codex)"`
-	PluginDir            string                            `toml:"plugin_dir"             description:"folder of the exec agent plugins, named reviewrules-agent-<agent>"                                                         default-text:"~/.config/reviewrules/plugins"`
-	PromptsDir           string                            `toml:"prompts_dir"            description:"folder of prompt files that replace the built-in agent prompts; a file keeps its built-in name; empty uses the built-in prompts" default-text:"built-in prompts"`
-	ClaudeBinary         string                            `toml:"claude_binary"          description:"claude binary for the claude agent"`
-	CodexBinary          string                            `toml:"codex_binary"           description:"codex binary for the codex agent"`
-	Prices               map[string]review.ModelTokenPrice `toml:"prices"                 description:"per-model price table [<case>.prices.\"<model>\"] with input, cached, output in USD per 1M tokens; an entry replaces the built-in price" default-text:"built in for the default models"`
+	Agent                ReviewAgentKind                                     `toml:"agent"                  description:"backend: fantasy (LiteLLM endpoint), openai or openrouter (direct API), claude or codex (built-in plugins), or an exec plugin name; unset picks the one backend found on this machine, and several found fail the run" default-text:"detected"`
+	BaseURL              string                                              `toml:"base_url"               description:"endpoint for fantasy; for openai and openrouter only when it differs from the default LiteLLM URL"`
+	Model                string                                              `toml:"model"                  description:"model for the parent session, the rule forks, and the hypothesis checkers; unset takes the agent default: gpt-6-luna for the API backends, the CLI default for claude and codex" default-text:"per agent"`
+	HypothesisModel      string                                              `toml:"hypothesis_model"       description:"model that writes the correctness hypotheses; unset takes the agent default: gpt-6.1-sol for the API backends, the CLI default for claude and codex" default-text:"per agent"`
+	HypothesisCheckModel string                                              `toml:"hypothesis_check_model" description:"model that answers each hypothesis; empty uses model"                                                                        default-text:"model"`
+	ReasoningEffort      string                                              `toml:"reasoning_effort"       description:"effort for the parent session and the hypothesis forks"`
+	RuleReasoningEffort  string                                              `toml:"rule_reasoning_effort"  description:"effort for the rule forks; at medium a small model skips checks at random"`
+	Profiles             map[rulecatalog.ThinkingProfile]review.ForkSettings `toml:"profiles"               description:"thinking profile table [<case>.profiles.<light|medium|heavy>] with model, reasoning_effort, fork_steps; a rule's profile field picks one; an empty field keeps model, rule_reasoning_effort, fork_steps"`
+	RuleDirs             map[string]string                                   `toml:"rule_dirs" description:"more rule folders [<case>.rule_dirs] as name = path; each path holds .reviewrules/config.json, its rules are <name>/<rule id>; a relative path is in the reviewed repo, ~/ is the home folder; a path with no config.json is skipped"`
+	Parallel             int                                                 `toml:"parallel"               description:"forks running at the same time"`
+	ParentSteps          int                                                 `toml:"parent_steps"           description:"tool-call steps for the parent session"`
+	ForkSteps            int                                                 `toml:"fork_steps"             description:"tool-call steps for each fork (not used by codex)"`
+	PluginDir            string                                              `toml:"plugin_dir"             description:"folder of the exec agent plugins, named reviewrules-agent-<agent>"                                                         default-text:"~/.config/reviewrules/plugins"`
+	PromptsDir           string                                              `toml:"prompts_dir"            description:"folder of prompt files that replace the built-in agent prompts; a file keeps its built-in name; empty uses the built-in prompts" default-text:"built-in prompts"`
+	ClaudeBinary         string                                              `toml:"claude_binary"          description:"claude binary for the claude agent"`
+	CodexBinary          string                                              `toml:"codex_binary"           description:"codex binary for the codex agent"`
+	Prices               map[string]review.ModelTokenPrice                   `toml:"prices"                 description:"per-model price table [<case>.prices.\"<model>\"] with input, cached, output in USD per 1M tokens; an entry replaces the built-in price" default-text:"built in for the default models"`
 }
 
 type userConfigFile struct {
@@ -68,19 +71,22 @@ type userConfigFile struct {
 // DefaultUserConfig is what a run uses with no user config file.
 func DefaultUserConfig() UserConfig {
 	return UserConfig{
-		Agent:               ReviewAgentKindFantasy,
 		BaseURL:             "http://localhost:4000/v1",
-		Model:               "gpt-6-luna",
-		HypothesisModel:     "gpt-6.1-sol",
 		ReasoningEffort:     "medium",
 		RuleReasoningEffort: "high",
-		Parallel:            8,
-		ParentSteps:         8,
-		ForkSteps:           8,
-		PluginDir:           filepath.Join(reviewrulesConfigDir(), "plugins"),
-		ClaudeBinary:        "claude",
-		CodexBinary:         "codex",
-		Prices:              review.DefaultModelTokenPrices(),
+		Profiles: map[rulecatalog.ThinkingProfile]review.ForkSettings{
+			rulecatalog.ThinkingProfileLight:  {ReasoningEffort: "low"},
+			rulecatalog.ThinkingProfileMedium: {},
+			rulecatalog.ThinkingProfileHeavy:  {MaxSteps: 16},
+		},
+		Parallel:     8,
+		ParentSteps:  8,
+		ForkSteps:    8,
+		RuleDirs:     map[string]string{},
+		PluginDir:    filepath.Join(reviewrulesConfigDir(), "plugins"),
+		ClaudeBinary: "claude",
+		CodexBinary:  "codex",
+		Prices:       review.DefaultModelTokenPrices(),
 	}
 }
 
@@ -108,8 +114,14 @@ func UserConfigCaseFromEnv(ciEnv string) UserConfigCase {
 }
 
 func (c UserConfig) validate() error {
-	if c.Agent == ReviewAgentKindUnknown {
-		return errors.New("user config agent is empty")
+	for name := range c.Profiles {
+		profile, err := rulecatalog.ParseThinkingProfile(string(name))
+		if err != nil {
+			return fmt.Errorf("user config profiles.%q: %w", name, err)
+		}
+		if profile != name {
+			return fmt.Errorf("user config profiles.%q: write the profile name as %q", name, profile)
+		}
 	}
 	return nil
 }

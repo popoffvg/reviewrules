@@ -76,6 +76,8 @@ type HypothesisCheckItem struct {
 	At       string
 	Question string
 	Look     string
+	// Undecided is why the ledger fork left the row UNSURE; it is empty in the ledger itself.
+	Undecided string
 }
 
 // Set is the prompt text of one run. Default is the embedded text. Load replaces a file that prompts_dir holds.

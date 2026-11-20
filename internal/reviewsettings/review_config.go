@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -75,6 +76,34 @@ func LoadReviewConfig(userConfigPath string, userCase UserConfigCase, repoRoot s
 	return config, config.User.validate()
 }
 
+// AgentDefaults are the values of the agent keys that a run takes when no config file sets them.
+// Source names where they came from in --print-config, for example "detected: claude in PATH".
+type AgentDefaults struct {
+	Agent           ReviewAgentKind
+	Model           string
+	HypothesisModel string
+	Source          string
+}
+
+// WithAgentDefaults returns the config with each unset agent key taken from defaults.
+func (c ReviewConfig) WithAgentDefaults(defaults AgentDefaults) ReviewConfig {
+	sources := maps.Clone(c.sources)
+	user := c.User
+	if user.Agent == ReviewAgentKindUnknown {
+		user.Agent = defaults.Agent
+		sources["agent"] = defaults.Source
+	}
+	if user.Model == "" && defaults.Model != "" {
+		user.Model = defaults.Model
+		sources["model"] = defaults.Source
+	}
+	if user.HypothesisModel == "" && defaults.HypothesisModel != "" {
+		user.HypothesisModel = defaults.HypothesisModel
+		sources["hypothesis_model"] = defaults.Source
+	}
+	return ReviewConfig{Repo: c.Repo, User: user, sources: sources}
+}
+
 // recordSources marks every key of file that the decoded file defines under prefix. A map key
 // records each of its entries; a list of tables records each entry when the file defines the list.
 func (c *ReviewConfig) recordSources(file ConfigFile, meta toml.MetaData, prefix toml.Key, source string) {
@@ -100,7 +129,7 @@ func (c *ReviewConfig) recordSources(file ConfigFile, meta toml.MetaData, prefix
 func (c ReviewConfig) printedNames(key ConfigKey) []toml.Key {
 	value := key.value(c)
 	switch {
-	case value.Kind() == reflect.Map:
+	case value.Kind() == reflect.Map && value.Len() > 0:
 		var names []toml.Key
 		for _, entry := range value.MapKeys() {
 			names = append(names, toml.Key{key.Name, entry.String()})
@@ -128,8 +157,8 @@ func (c ReviewConfig) WriteMergedConfig(out io.Writer, ruleSetCommits map[string
 		for index, name := range c.printedNames(key) {
 			entry := value
 			switch {
-			case value.Kind() == reflect.Map:
-				entry = value.MapIndex(reflect.ValueOf(name[1]))
+			case value.Kind() == reflect.Map && len(name) > 1:
+				entry = value.MapIndex(reflect.ValueOf(name[1]).Convert(value.Type().Key()))
 			case len(name) > 1:
 				entry = value.Index(index)
 			}

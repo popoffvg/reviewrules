@@ -11,7 +11,8 @@ Put a `config.json` in `.reviewrules/` at the repo root, or in a folder that `ru
       "id": "test-conventions",
       "rule": "Tests: use testing.TB; use t.Cleanup for cleanup; use t.Context(); use t.TempDir(); use '-' instead of spaces in t.Run titles",
       "scope": ["**/*_test.go"],
-      "severity": "medium"
+      "severity": "medium",
+      "profile": "light"
     }
   ]
 }
@@ -19,6 +20,7 @@ Put a `config.json` in `.reviewrules/` at the repo root, or in a folder that `ru
 
 - `scope` is a list of globs. A rule whose scope matches no changed file is skipped.
 - `severity` is `low`, `medium`, or `high`. `fail_on` in the repo settings sets the lowest severity that fails the run.
+- `profile` is `light`, `medium` (the default), or `heavy`. It picks the model, the reasoning effort, and the step budget of the rule fork from the `profiles` table of the user config. Give a simple text check `light`, and a rule that must read callers or other files `heavy`.
 - A rule written as `lead: a; b; c` with 3 or more short items is split into one check per item (`test-conventions#1`, `#2`, …). Each item gets its own fork.
 - `files.json` lists the docs the rules refer to (`path`, `description`, `scope`). A doc whose scope matches a changed file goes into the parent session.
 - A nested folder can have its own rule folder with more rules. Only the root's `instructions` and `ignorePatterns` are used.

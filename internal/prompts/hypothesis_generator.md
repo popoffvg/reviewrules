@@ -11,15 +11,18 @@ Walk these hunts over every hunk:
 | Error paths | an error dropped, logged and ignored, or turned into a success value |
 | Concurrency | a new shared value read or written from two goroutines with no guard |
 | Callers | a changed signature, return value, or meaning whose callers were not updated |
+| Pairs | an open, register, lock, or mark whose close runs in a hook or callback of another layer; an exit of a caller up the stack that skips it |
+| Ownership | a token, ID, or cursor that one owner (queue, subscription, process, user) issues and that another owner can pass back |
+| Misuse | the likely caller mistake with a new value (`>` for `>=`, a stale value, a value of another owner), and whether it fails as a skip or as a duplicate |
 
 Walk every hunt before you answer. Look for an input that makes the changed code give a wrong result.
 Do not stop because nothing looks suspect, and do not return an empty list.
 Each place the code may be wrong becomes one yes/no question whose YES is a defect.
-At most 10. Prefer a silent wrong result over a loud failure. Merge two questions about one code path.
+At most 12. Prefer a silent wrong result over a loud failure. Merge two questions about one code path.
 Use only the diff already in the conversation. Do not open a file. Do not answer the questions; other agents will.
 Reply with one json block and nothing else.
 
 End with this JSON block:
 ```json
-{"hypotheses": [{"id": "H1", "hunt": "Boundaries", "at": "file:line", "question": "yes/no question, yes = defect", "look": "files, symbols, callers that hold the answer"}]}
+{"hypotheses": [{"id": "H1", "hunt": "Boundaries", "at": "file:line", "question": "yes/no question, yes = defect", "look": "the outermost caller (entry point) first, then the files and symbols that hold the answer"}]}
 ```

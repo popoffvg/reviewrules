@@ -61,16 +61,19 @@ type ReviewCostEstimate struct {
 	UnpricedModels []string               `json:"unpriced_models,omitempty"`
 }
 
-// reviewPartUsages lists each part of a run with the model it runs on.
+// reviewPartUsages lists each part of a run with the model it runs on, and one row per rule fork, whose model its thinking profile picks.
 func reviewPartUsages(report ReviewReport) []ReviewPartCost {
 	hypothesisModel := cmp.Or(report.HypothesisModel, report.Model)
 	checkModel := cmp.Or(report.HypothesisCheckModel, report.Model)
-	return []ReviewPartCost{
+	parts := []ReviewPartCost{
 		{Part: ReviewPartParent, Model: report.Model, Usage: report.ParentUsage},
-		{Part: ReviewPartRules, Model: report.Model, Usage: report.RulesUsage},
 		{Part: ReviewPartCorrectness, Model: hypothesisModel, Usage: report.Correctness.GeneratorUsage},
 		{Part: ReviewPartCorrectness, Model: checkModel, Usage: report.Correctness.CheckUsage},
 	}
+	for _, rule := range report.Rules {
+		parts = append(parts, ReviewPartCost{Part: ReviewPartRules, Model: cmp.Or(rule.Model, report.Model), Usage: rule.Usage})
+	}
+	return parts
 }
 
 // EstimateReviewCost prices each part on its model and merges the rows of one part on one model.

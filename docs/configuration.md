@@ -22,13 +22,15 @@ reviewrules has five flags and `--print-config` (see the Flags table in `README.
 | `correctness` | `.reviewrules/settings.toml` | `true` | run the hypothesis generator and one checker fork per hypothesis |
 | `max_diff_bytes` | `.reviewrules/settings.toml` | `300000` | refuse a diff larger than this |
 | `rule_sets` | `.reviewrules/settings.toml` | `[]` | shared rule sets [[rule_sets]] with name, url, ref; each adds the rules of its root .reviewrules/ as &lt;name&gt;/&lt;rule id&gt; |
-| `agent` | `~/.config/reviewrules/config.toml` | `"fantasy"` | backend: fantasy (LiteLLM endpoint), openai or openrouter (direct API), claude or codex (built-in plugins), or an exec plugin name |
+| `agent` | `~/.config/reviewrules/config.toml` | `detected` | backend: fantasy (LiteLLM endpoint), openai or openrouter (direct API), claude or codex (built-in plugins), or an exec plugin name; unset picks the one backend found on this machine, and several found fail the run |
 | `base_url` | `~/.config/reviewrules/config.toml` | `"http://localhost:4000/v1"` | endpoint for fantasy; for openai and openrouter only when it differs from the default LiteLLM URL |
-| `model` | `~/.config/reviewrules/config.toml` | `"gpt-6-luna"` | model for the parent session, the rule forks, and the hypothesis checkers |
-| `hypothesis_model` | `~/.config/reviewrules/config.toml` | `"gpt-6.1-sol"` | model that writes the correctness hypotheses |
+| `model` | `~/.config/reviewrules/config.toml` | `per agent` | model for the parent session, the rule forks, and the hypothesis checkers; unset takes the agent default: gpt-6-luna for the API backends, the CLI default for claude and codex |
+| `hypothesis_model` | `~/.config/reviewrules/config.toml` | `per agent` | model that writes the correctness hypotheses; unset takes the agent default: gpt-6.1-sol for the API backends, the CLI default for claude and codex |
 | `hypothesis_check_model` | `~/.config/reviewrules/config.toml` | `model` | model that answers each hypothesis; empty uses model |
 | `reasoning_effort` | `~/.config/reviewrules/config.toml` | `"medium"` | effort for the parent session and the hypothesis forks |
 | `rule_reasoning_effort` | `~/.config/reviewrules/config.toml` | `"high"` | effort for the rule forks; at medium a small model skips checks at random |
+| `profiles` | `~/.config/reviewrules/config.toml` | `{"heavy":{"fork_steps":16},"light":{"reasoning_effort":"low"},"medium":{}}` | thinking profile table [&lt;case&gt;.profiles.&lt;light\|medium\|heavy&gt;] with model, reasoning_effort, fork_steps; a rule's profile field picks one; an empty field keeps model, rule_reasoning_effort, fork_steps |
+| `rule_dirs` | `~/.config/reviewrules/config.toml` | `{}` | more rule folders [&lt;case&gt;.rule_dirs] as name = path; each path holds .reviewrules/config.json, its rules are &lt;name&gt;/&lt;rule id&gt;; a relative path is in the reviewed repo, ~/ is the home folder; a path with no config.json is skipped |
 | `parallel` | `~/.config/reviewrules/config.toml` | `8` | forks running at the same time |
 | `parent_steps` | `~/.config/reviewrules/config.toml` | `8` | tool-call steps for the parent session |
 | `fork_steps` | `~/.config/reviewrules/config.toml` | `8` | tool-call steps for each fork (not used by codex) |
@@ -79,6 +81,22 @@ A rule set is a git repo with `.reviewrules/config.json`, and an optional `.revi
 - Only the root `.reviewrules/` of the rule set is read. Its nested rule folders, its `settings.toml`, and its `ignorePatterns` are not used. Its `instructions` go into the parent prompt after the repo's own instructions, under the header `# Rule set <name> review instructions`.
 - The `scope` globs of its rules and docs match paths of the reviewed repo. The doc paths in its `files.json` are read from the rule set checkout, and their text goes into the prompt. The agents can read only the reviewed repo.
 
+## Rule dirs
+
+`rule_dirs` in the user config adds rule folders that are not in git, for example notes that are ignored by git, or rules that apply to every repo you review:
+
+```toml
+[local.rule_dirs]
+adr = ".notes"
+global = "~/.notes"
+```
+
+- Each path is a folder that holds `.reviewrules/config.json` and, if needed, `files.json`. It has the layout of a rule set, and its rule ids get the prefix `<name>/`.
+- A relative path is in the reviewed repo, and `~/` is the home folder. So one user config line gives every repo its own notes.
+- A folder with no `.reviewrules/config.json` is skipped, and the run logs it. A name that a `[[rule_sets]]` entry of the repo settings also has stops the run with exit code 2.
+- reviewrules reads the folder as it is at run time, with no fetch and no ref.
+- A repo with no `.reviewrules/config.json` of its own still runs when a rule dir or a rule set gives rules. Without both, the run stops with exit code 2.
+
 ## User config
 
 A full user config:
@@ -105,6 +123,13 @@ input = 0.10
 cached = 0.01
 output = 0.50
 
+[local.profiles.light]
+reasoning_effort = "low"
+
+[local.profiles.heavy]
+model = "gpt-6.1-sol"
+fork_steps = 16
+
 [ci]
 agent = "openrouter"
 model = "openai/gpt-6-luna"
@@ -129,6 +154,17 @@ Write `plugin_dir` and `prompts_dir` as absolute paths: reviewrules does not exp
 | `last_step_answer.md` | the last tool step of an API backend |
 
 The `.tmpl` files are Go templates with the same fields as the built-in files. A check still answers with the JSON block the built-in prompt names: reviewrules reads the checks, not a free-form verdict.
+
+### Agent detection
+
+With no `agent` key in the used case, reviewrules looks for each backend on the machine:
+
+- `codex` and `claude`: the `codex_binary` and `claude_binary` in `PATH`.
+- `fantasy`, `openai`, and `openrouter`: `LITELLM_API_KEY`, `OPENAI_API_KEY`, and `OPENROUTER_API_KEY` set.
+
+One backend found: the run uses it, and `--print-config` shows `# detected: <what it found>`. No backend or several backends found: the run stops with exit code 2, and the error names what it found and the user config file to write `agent` to. An exec plugin is never detected; name it in `agent`.
+
+An unset `model` or `hypothesis_model` takes the default of the agent: `gpt-6-luna` and `gpt-6.1-sol` for the API backends, and the CLI's own default for `claude` and `codex`.
 
 ### The `[local]` and `[ci]` cases
 

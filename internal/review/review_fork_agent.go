@@ -1,6 +1,7 @@
 package review
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 
@@ -29,11 +30,21 @@ type ReviewForkAgent interface {
 type ReviewForkAgentFactory func(promptCacheKey string) ReviewForkAgent
 
 // ForkSettings selects the model, the reasoning effort, and the tool-call budget of one call.
-// An empty Model or ReasoningEffort uses the backend's default.
+// An empty Model or ReasoningEffort uses the backend's default. In a thinking profile of the user
+// config, an empty field keeps the value of the rule forks.
 type ForkSettings struct {
-	Model           string
-	ReasoningEffort string
-	MaxSteps        int
+	Model           string `json:"model,omitempty"            toml:"model,omitempty"`
+	ReasoningEffort string `json:"reasoning_effort,omitempty" toml:"reasoning_effort,omitempty"`
+	MaxSteps        int    `json:"fork_steps,omitempty"       toml:"fork_steps,omitzero"`
+}
+
+// withProfile gives the settings of a rule fork: each non-empty field of profile replaces the base value.
+func (base ForkSettings) withProfile(profile ForkSettings) ForkSettings {
+	return ForkSettings{
+		Model:           cmp.Or(profile.Model, base.Model),
+		ReasoningEffort: cmp.Or(profile.ReasoningEffort, base.ReasoningEffort),
+		MaxSteps:        cmp.Or(profile.MaxSteps, base.MaxSteps),
+	}
 }
 
 // ForkReply is the last text a fork wrote, its usage, and the id AppendToFork takes.

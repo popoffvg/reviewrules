@@ -75,6 +75,37 @@ func TestGenerateHypothesesKeepsOneHypothesis(t *testing.T) {
 	}
 }
 
+func TestRecheckSendsTheUndecidedReason(t *testing.T) {
+	agent := &promptRecordingForkAgent{scriptForkAgent: scriptForkAgent{text: `{"verdicts": [{"id": "H1", "verdict": "REFUTED", "evidence": ["b.go:7 — if token == nil { return } — the nil token never reaches ack"]}]}`}}
+	undecided := HypothesisCheck{
+		Hypothesis: Hypothesis{ID: "H1", At: "a.go:1", Question: "Does a nil token ack every notification?"},
+		Verdict:    HypothesisVerdictUnsure,
+		Evidence:   []string{"the caller of ackBelow is not in the diff"},
+		Usage:      fantasy.Usage{InputTokens: 5},
+	}
+	check := RecheckUndecidedHypothesis(t.Context(), agent, ForkSettings{}, undecided, prompts.Default())
+	if check.Verdict != HypothesisVerdictRefuted {
+		t.Fatalf("verdict = %s; want REFUTED", check.Verdict)
+	}
+	if !strings.Contains(agent.prompt, "left this row undecided: the caller of ackBelow is not in the diff") {
+		t.Fatalf("prompt does not carry the undecided reason:\n%s", agent.prompt)
+	}
+	if check.Usage.InputTokens != 5 {
+		t.Fatalf("usage = %d input tokens; want the ledger usage kept", check.Usage.InputTokens)
+	}
+}
+
+// promptRecordingForkAgent keeps the last ledger prompt.
+type promptRecordingForkAgent struct {
+	scriptForkAgent
+	prompt string
+}
+
+func (a *promptRecordingForkAgent) ForkHypothesisLedger(ctx context.Context, prompt string, settings ForkSettings, hypotheses []Hypothesis) (ForkReply, error) {
+	a.prompt = prompt
+	return a.scriptForkAgent.ForkHypothesisLedger(ctx, prompt, settings, hypotheses)
+}
+
 // scriptForkAgent returns one fixed fork reply and never retries.
 type scriptForkAgent struct {
 	text string

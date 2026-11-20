@@ -40,6 +40,7 @@ func SplitRuleRequirements(rule ReviewRule) []ReviewRule {
 			Text:     text,
 			Scope:    rule.Scope,
 			Severity: rule.Severity,
+			Profile:  rule.Profile,
 		})
 	}
 	return requirements

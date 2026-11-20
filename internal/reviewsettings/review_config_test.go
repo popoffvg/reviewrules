@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/popoffvg/reviewrules/internal/review"
+	"github.com/popoffvg/reviewrules/internal/rulecatalog"
 )
 
 const testUserConfig = `
@@ -47,8 +48,8 @@ func TestLoadReviewConfigUserCases(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if local.User.Agent != ReviewAgentKindCodex || local.User.Parallel != 4 || local.User.HypothesisModel != "gpt-6.1-sol" {
-		t.Errorf("local case = %+v; want codex, parallel 4, default hypothesis model", local.User)
+	if local.User.Agent != ReviewAgentKindCodex || local.User.Parallel != 4 || local.User.HypothesisModel != "" {
+		t.Errorf("local case = %+v; want codex, parallel 4, hypothesis model left for the agent default", local.User)
 	}
 	if got := local.User.Prices["gpt-6-luna"]; got != (review.ModelTokenPrice{Input: 1, CachedInput: 0.5, Output: 2}) {
 		t.Errorf("gpt-6-luna price = %+v; want the table entry", got)
@@ -113,7 +114,10 @@ func TestLoadReviewConfigRejectsBadKeys(t *testing.T) {
 		{name: "backslash", repo: `rule_folders = ["a\\b"]`, wantErr: "bad rule folder name"},
 		{name: "parent-dir", repo: `rule_folders = [".."]`, wantErr: "bad rule folder name"},
 		{name: "empty-name", repo: `rule_folders = [""]`, wantErr: "bad rule folder name"},
-		{name: "empty-agent", user: "[local]\nagent = \"\"", wantErr: "user config agent is empty"},
+		{name: "unknown-profile", user: "[local.profiles.deep]\nmodel = \"x\"", wantErr: `user config profiles."deep": review rule profile "deep" is not light, medium, or heavy`},
+		{name: "uppercase-profile", user: "[local.profiles.LIGHT]\nmodel = \"x\"", wantErr: `user config profiles."LIGHT": write the profile name as "light"`},
+		{name: "empty-profile-name", user: "[local.profiles.\"\"]\nmodel = \"x\"", wantErr: `user config profiles."": write the profile name as "medium"`},
+		{name: "unknown-profile-field", user: "[local.profiles.light]\neffort = \"low\"", wantErr: `config key unknown: "local.profiles.light.effort"`},
 		{name: "rule-set-unknown-field", repo: "[[rule_sets]]\nname = \"go\"\nurl = \"file:///x\"\nref = \"v1\"\nbranch = \"main\"", wantErr: `rule set entry invalid: [[rule_sets]] entry 1 (name "go"): unknown field "branch"`, wantSource: "settings.toml"},
 		{name: "rule-set-missing-ref", repo: "[[rule_sets]]\nname = \"go\"\nurl = \"file:///x\"", wantErr: `rule set entry invalid: [[rule_sets]] entry 1 (name "go"): field "ref" missing`, wantSource: "settings.toml"},
 		{name: "rule-set-bad-name", repo: "[[rule_sets]]\nname = \"Go_Rules\"\nurl = \"file:///x\"\nref = \"v1\"", wantErr: `field "name": value "Go_Rules" MUST match [a-z0-9-]+`},
@@ -180,11 +184,14 @@ func TestWriteMergedConfigNamesEachSource(t *testing.T) {
 			t.Errorf("line for %s = %q; want it to end with %q", name, lines[name], want)
 		}
 	}
+	if !strings.HasPrefix(strings.TrimSpace(strings.TrimPrefix(lines["profiles.medium"], "profiles.medium")), "= {}") {
+		t.Errorf("medium profile line = %q; want an empty inline table", lines["profiles.medium"])
+	}
 	if !strings.Contains(lines["prices.gpt-6-luna"], "{input = 1.0, cached = 0.5, output = 2.0}") {
 		t.Errorf("price line = %q; want the inline table", lines["prices.gpt-6-luna"])
 	}
-	if len(lines) != len(ConfigKeys())-1+len(config.User.Prices) {
-		t.Errorf("printed %d lines; want one per key and one per price:\n%s", len(lines), out.String())
+	if len(lines) != len(ConfigKeys())-2+len(config.User.Prices)+len(config.User.Profiles) {
+		t.Errorf("printed %d lines; want one per key, one per price, and one per profile:\n%s", len(lines), out.String())
 	}
 }
 
@@ -218,5 +225,29 @@ ref = "main"
 		if !strings.Contains(out.String(), want+"\n") {
 			t.Errorf("output has no line %q:\n%s", want, out.String())
 		}
+	}
+}
+
+func TestLoadReviewConfigProfiles(t *testing.T) {
+	userPath := filepath.Join(t.TempDir(), "config.toml")
+	writeConfigFile(t, userPath, `
+[local]
+agent = "claude"
+
+[local.profiles.heavy]
+model = "opus"
+reasoning_effort = "xhigh"
+`)
+	config, err := LoadReviewConfig(userPath, UserConfigCaseLocal, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[rulecatalog.ThinkingProfile]review.ForkSettings{
+		rulecatalog.ThinkingProfileLight:  {ReasoningEffort: "low"},
+		rulecatalog.ThinkingProfileMedium: {},
+		rulecatalog.ThinkingProfileHeavy:  {Model: "opus", ReasoningEffort: "xhigh"},
+	}
+	if !reflect.DeepEqual(config.User.Profiles, want) {
+		t.Fatalf("profiles = %+v; want the heavy table over the built-in light and medium", config.User.Profiles)
 	}
 }
