@@ -5,7 +5,7 @@ description: Run reviewrules on a git diff and act on its verdicts — install i
 
 # Run reviewrules
 
-reviewrules checks a git diff against the rules in `.reviewrules/` at the repo root, and in the other rule folders that `rule_folders` in `.reviewrules/settings.toml` names. reviewrules has five flags: `--config`, `--repo`, `--base`, `--worktree`, `--json-out`, plus `--print-config`. Every other choice is a key in the repo settings `.reviewrules/settings.toml` or in the user config `~/.config/reviewrules/config.toml`. Every key, its file, its default, and full examples are in `docs/configuration.md`; this skill does not list them.
+reviewrules checks a git diff against the rules in `.reviewrules/` at the repo root, and in the other rule folders that `rule_folders` in `.reviewrules/settings.toml` names. The flags are in the Flags table in the reviewrules `README.md`. When a run fails on a finding that is by design or wrong, run again with `--context "<file:line>: <why>"`; the reviewer checks the note against the code. Every other choice is a key in the repo settings `.reviewrules/settings.toml` or in the user config `~/.config/reviewrules/config.toml`. Every key, its file, its default, and full examples are in `docs/configuration.md`; this skill does not list them.
 
 ## Steps
 

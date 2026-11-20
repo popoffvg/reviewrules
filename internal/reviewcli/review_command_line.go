@@ -4,6 +4,7 @@ package reviewcli
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/jessevdk/go-flags"
 
@@ -12,12 +13,13 @@ import (
 
 // ReviewFlags are the only flags; every other choice is a key of a config file.
 type ReviewFlags struct {
-	Config      string `long:"config"       description:"user config file; [local] is used, or [ci] when CI=true" default-mask:"~/.config/reviewrules/config.toml"`
-	Repo        string `long:"repo"         description:"repository root to review; its .reviewrules/settings.toml is the repo settings"`
-	Base        string `long:"base"         description:"base ref; the diff starts at merge-base(base, HEAD)"`
-	Worktree    bool   `long:"worktree"     description:"review uncommitted changes too (local run before a push)"`
-	JSONOut     string `long:"json-out"     description:"write the JSON report to this file, or to stdout with \"-\"; with CI=true and no flag it goes to stdout" default-mask:"none"`
-	PrintConfig bool   `long:"print-config" description:"print every merged config value and the file that gave it, then exit without a review"`
+	Config      string   `long:"config"       description:"user config file; [local] is used, or [ci] when CI=true" default-mask:"~/.config/reviewrules/config.toml"`
+	Repo        string   `long:"repo"         description:"repository root to review; its .reviewrules/settings.toml is the repo settings"`
+	Base        string   `long:"base"         description:"base ref; the diff starts at merge-base(base, HEAD)"`
+	Worktree    bool     `long:"worktree"     description:"review uncommitted changes too (local run before a push)"`
+	JSONOut     string   `long:"json-out"     description:"write the JSON report to this file, or to stdout with \"-\"; with CI=true and no flag it goes to stdout" default-mask:"none"`
+	PrintConfig bool     `long:"print-config" description:"print every merged config value and the file that gave it, then exit without a review"`
+	Context     []string `long:"context" description:"a note for the reviewer on this run, such as why a finding is by design; one line; the reviewer checks it against the code; repeat the flag for more notes"`
 }
 
 // DefaultReviewFlags is what a run uses for the flags the command line does not set.
@@ -44,4 +46,15 @@ func NewReviewCommandLine() (ReviewCommandLine, error) {
 		return ReviewCommandLine{}, fmt.Errorf("review flags: %w", err)
 	}
 	return ReviewCommandLine{Parser: parser, Flags: &reviewFlags}, nil
+}
+
+// CheckContextNotes refuses a --context note with a line break: the parent prompt quotes each note
+// as one list item, and a second line could start a heading that reads as an instruction.
+func CheckContextNotes(notes []string) error {
+	for _, note := range notes {
+		if strings.ContainsAny(note, "\r\n") {
+			return fmt.Errorf("context note has a line break: write each note as one line, and repeat --context for more: %q", note)
+		}
+	}
+	return nil
 }

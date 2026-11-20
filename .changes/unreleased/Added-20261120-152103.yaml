@@ -1,0 +1,3 @@
+kind: Added
+body: '`--instruction "<note>"` gives the reviewer an author note for one run, such as why a finding is by design; the flag repeats, the reviewer checks each note against the code, and a failed run names the flag'
+time: 2026-11-20T15:21:03.93311+01:00

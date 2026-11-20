@@ -51,6 +51,11 @@ func runReviewRules() int {
 		return 2
 	}
 	options := commandLine.Flags
+	err = reviewcli.CheckContextNotes(options.Context)
+	if err != nil {
+		logger.Error("reviewrules context note invalid", "error", err)
+		return 2
+	}
 
 	root, err := filepath.Abs(options.Repo)
 	if err != nil {
@@ -139,6 +144,7 @@ func runReviewRules() int {
 		ForkMaxSteps:             userConfig.ForkSteps,
 		CorrectnessEnabled:       config.Repo.Correctness,
 		Prompts:                  agentPrompts,
+		RunContext:               options.Context,
 	})
 	if err != nil {
 		logger.Error("reviewrules run failed", "error", err)
@@ -173,6 +179,7 @@ func runReviewRules() int {
 		for _, reason := range reasons {
 			_, _ = fmt.Fprintln(summaryOut, "  - "+reason)
 		}
+		_, _ = fmt.Fprintln(summaryOut, "\n"+findingDisputeHint)
 	}
 	if len(reasons) > 0 {
 		return 1
@@ -335,6 +342,10 @@ func usageTokens(usage fantasy.Usage) string {
 
 // jsonToStdout is the --json-out value that sends the JSON report to stdout.
 const jsonToStdout = "-"
+
+// findingDisputeHint ends a failed summary: the agent that reads it learns how to answer a finding that is wrong or by design.
+const findingDisputeHint = `A finding that is by design or wrong: run again with --context "<file:line>: <why the finding does not apply, with the line that proves it>". ` +
+	`Repeat the flag for each finding. The reviewer checks each note against the code, so fix a real defect instead of explaining it away.`
 
 // reviewJSONTarget returns where the JSON report goes: the --json-out value, stdout when CI=true
 // and the flag is unset, or "" for no JSON (a local run prints only the summary).

@@ -43,10 +43,12 @@ type ParentSessionInput struct {
 	Instructions string
 	// RuleSetInstructions go after Instructions; with none, the prompt has no rule set section.
 	RuleSetInstructions []RuleSetInstructions
-	Docs                []ConventionDoc
-	Base                string
-	ChangedFiles        []string
-	Patch               string
+	// RunContext are the author's --context notes; with none, the prompt has no run section.
+	RunContext   []string
+	Docs         []ConventionDoc
+	Base         string
+	ChangedFiles []string
+	Patch        string
 }
 
 // RuleSetInstructions is the instructions text of one rule set, under a header with its name.

@@ -112,6 +112,7 @@ Every other setting lives in a config file. This table is generated from the CLI
 | `--worktree` | `false` | review uncommitted changes too (local run before a push) |
 | `--json-out` | `none` | write the JSON report to this file, or to stdout with "-"; with CI=true and no flag it goes to stdout |
 | `--print-config` | `false` | print every merged config value and the file that gave it, then exit without a review |
+| `--context` |  | a note for the reviewer on this run, such as why a finding is by design; one line; the reviewer checks it against the code; repeat the flag for more notes |
 <!-- flags:end -->
 
 ## Guides

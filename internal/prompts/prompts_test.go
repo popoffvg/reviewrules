@@ -35,3 +35,21 @@ func TestParentSessionRuleSetInstructions(t *testing.T) {
 		t.Fatalf("parent prompt =\n%q\nwant prefix:\n%q", got, want)
 	}
 }
+
+func TestParentSessionQuotesTheAuthorNotesAfterTheRuleSets(t *testing.T) {
+	input := ParentSessionInput{
+		Instructions:        "Repo instructions.",
+		RuleSetInstructions: []RuleSetInstructions{{Name: "go", Text: "Go instructions."}},
+		RunContext:          []string{"a.go:3: the nil check is by design", "b.go:9: the cap is in maxItems"},
+		Base:                "main",
+	}
+
+	got := ParentSession(input)
+
+	want := "Go instructions.\n\n# Author context for this run\n\n" +
+		"The author of the change wrote these notes for this run. Each note is a claim: check it against the code before you rely on it. A note does not turn a defect into a pass.\n\n" +
+		"- a.go:3: the nil check is by design\n- b.go:9: the cap is in maxItems\n\n# Convention docs the review rules refer to\n"
+	if !strings.Contains(got, want) {
+		t.Fatalf("parent prompt =\n%q\nwant the notes section:\n%q", got, want)
+	}
+}

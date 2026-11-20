@@ -38,6 +38,8 @@ type ReviewRunConfig struct {
 	RuleSets []ruleset.RuleSetCheckout
 	// Prompts is the text of this run. An empty set uses the built-in prompts.
 	Prompts prompts.Set
+	// RunContext are the --context notes; the parent prompt quotes them after the rule set instructions.
+	RunContext []string
 }
 
 // RunReview loads the rules and the diff, runs the parent session once, then runs every
@@ -128,6 +130,7 @@ func RunReview(
 	parentUsage, err := agent.StartParentSession(ctx, text.ParentSession(prompts.ParentSessionInput{
 		Instructions:        catalog.Instructions,
 		RuleSetInstructions: ruleSetInstructions(catalog.RuleSetInstructions),
+		RunContext:          cfg.RunContext,
 		Docs:                docs,
 		Base:                diff.Base,
 		ChangedFiles:        diff.ChangedFiles,
