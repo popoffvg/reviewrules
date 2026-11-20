@@ -95,7 +95,7 @@ global = "~/.notes"
 - A relative path is in the reviewed repo, and `~/` is the home folder. So one user config line gives every repo its own notes.
 - A folder with no `.reviewrules/config.json` is skipped, and the run logs it. A rule dir that reviewrules cannot read stops the run with exit code 2. A name that a `[[rule_sets]]` entry of the repo settings also has stops the run with exit code 2.
 - reviewrules reads the folder as it is at run time, with no fetch and no ref.
-- A repo with no `.reviewrules/config.json` of its own still runs when a rule dir or a rule set gives rules. Without both, the run stops with exit code 2.
+- A repo with no `.reviewrules/config.json` of its own still runs when a rule dir or a rule set is configured, even one with no rules. Without either, the run stops with exit code 2.
 
 ## User config
 

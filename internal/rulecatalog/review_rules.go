@@ -115,7 +115,7 @@ type ruleFilesFile struct {
 
 // LoadReviewRules reads the rules at the repo root, in every nested folder that git tracks, then in
 // each rule set. Each folder uses its first rule folder: .reviewrules, then ruleFolders in list
-// order. The root needs a rule folder unless a rule set or a rule dir gives rules; only the root's instructions and ignorePatterns are used. Nested
+// order. The root needs a rule folder unless a rule set or a rule dir is configured; only the root's instructions and ignorePatterns are used. Nested
 // scopes are repo-relative already.
 func LoadReviewRules(ctx context.Context, repoRoot string, ruleFolders []string, ruleSets []ruleset.RuleSetCheckout) (RuleCatalog, error) {
 	var catalog RuleCatalog
@@ -124,7 +124,7 @@ func LoadReviewRules(ctx context.Context, repoRoot string, ruleFolders []string,
 		return catalog, err
 	}
 	if !hasRoot && len(ruleSets) == 0 {
-		return catalog, fmt.Errorf("review rules not found: %s has no .reviewrules/config.json, and no rule set or rule dir gives rules; rule_folders in .reviewrules/settings.toml adds other folders", repoRoot)
+		return catalog, fmt.Errorf("review rules not found: %s has no .reviewrules/config.json, and no rule set or rule dir is configured; rule_folders in .reviewrules/settings.toml adds other folders", repoRoot)
 	}
 	catalog.RuleDirs = configDirs
 	for index, dir := range configDirs {
