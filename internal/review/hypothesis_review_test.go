@@ -46,6 +46,16 @@ func TestReviewHypothesesAcrossBranchRuns(t *testing.T) {
 	if len(again.agent.generators) != 0 || len(again.agent.checks) != 1 || again.report.Correctness.GeneratorUsage.InputTokens != 0 {
 		t.Fatal("unchanged review must skip generation and run the old check")
 	}
+	runHypothesisGit(t, repo, "commit", "--allow-empty", "-m", "Advance branch HEAD")
+	newHead := runHypothesisReview(t, cfg, `{"hypotheses":[]}`)
+	if newHead.report.Commit == firstCommit || len(newHead.agent.generators) != 1 || len(newHead.agent.checks) != 1 {
+		t.Fatal("new HEAD with an unchanged patch must run both generation and the old check")
+	}
+	cfg.HypothesisModelName = "other-generator"
+	newModel := runHypothesisReview(t, cfg, `{"hypotheses":[]}`)
+	if len(newModel.agent.generators) != 1 || len(newModel.agent.checks) != 1 {
+		t.Fatal("changed generator model must run generation and the old check")
+	}
 	err = os.WriteFile(filepath.Join(repo, ".reviewrules", "config.json"), []byte(`{"instructions":"Check empty values."}`), 0o600)
 	if err != nil {
 		t.Fatal(err)
@@ -56,7 +66,7 @@ func TestReviewHypothesesAcrossBranchRuns(t *testing.T) {
 	}
 
 	writeHypothesisFile(t, repo, "second.txt", "second-branch-change\n")
-	next := runHypothesisReview(t, cfg, `{"hypotheses":[{"slug":"first-defect","at":"first.txt:1","question":"Can the first change fail?"},{"slug":"first-defect","at":"second.txt:1","question":"Can the first change fail?"}]}`)
+	next := runHypothesisReview(t, cfg, `{"hypotheses":[{"slug":"first-defect","at":"first.txt:1","question":"Can the first change fail?","look":"updated caller"},{"slug":"first-defect","at":"second.txt:1","question":"Can the first change fail?"}]}`)
 	if len(next.agent.generators) != 1 || len(next.agent.checks) != 1 || len(next.report.Correctness.HypothesisCheck) != 2 {
 		t.Fatalf("next review launched %d generators and %d checks", len(next.agent.generators), len(next.agent.checks))
 	}
@@ -72,6 +82,9 @@ func TestReviewHypothesesAcrossBranchRuns(t *testing.T) {
 	checks := next.report.Correctness.HypothesisCheck
 	if checks[0].Commit != firstCommit || checks[1].Commit != next.report.Commit || checks[0].ID == checks[1].ID || checks[0].Slug == checks[1].Slug {
 		t.Errorf("hypothesis identities do not match their source commits: %+v", checks)
+	}
+	if checks[0].Look != "updated caller" {
+		t.Error("repeated hypothesis did not retain the new caller context")
 	}
 
 	runHypothesisGit(t, repo, "switch", "-c", "another-branch")

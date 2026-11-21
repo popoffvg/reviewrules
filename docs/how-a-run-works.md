@@ -17,10 +17,10 @@ See [review results](review-results.md) for verdicts, failure policy, usage, and
 
 ## Hypothesis cache
 
-The cache scopes questions to a Git repository, branch, review base, generator prompt, and author context. Each question has a stable slug and the HEAD commit when the generator first wrote it. The report records the commit reviewed in the current run.
+The cache scopes questions to a Git repository, branch, and review base. Each question has a stable slug and the HEAD commit when the generator first wrote it. The report records the commit reviewed in the current run.
 
-An unchanged diff skips the generator. After a commit, the generator focuses on the changes since the last cached review. A new merge base, a changed dirty snapshot, or a detached HEAD uses the full diff.
+Unchanged review inputs skip the generator. After a commit, the generator focuses on the changes since the last cached review. If the review inputs change and Git cannot supply a scoped delta, the generator uses the full diff.
 
-The cache stores questions in `~/.reviewrules/cache` and removes the least recently used entries first when it needs space. Every run verifies the questions against the current diff.
+The disk cache removes the least recently used entries first when it needs space. Every run verifies the questions against the current diff.
 
 If a branch's questions exceed the cache budget, the cache drops that branch's entry. The next run generates from the full diff.

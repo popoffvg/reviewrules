@@ -28,7 +28,11 @@ func (review hypothesisReview) hypotheses(
 	text prompts.Set,
 ) ([]Hypothesis, fantasy.Usage, error) {
 	template := hypothesisGeneratorPrompt(text, prompts.HypothesisGeneratorInput{})
-	cache, err := branchHypothesisCache(ctx, review.config, review.diff, review.ignorePatterns, hypothesisDigest(template))
+	review.contextDigest = hypothesisDigest(strings.Join([]string{
+		review.contextDigest, template, review.config.GeneratorBackend,
+		settings.Model, settings.ReasoningEffort, strconv.Itoa(settings.MaxSteps),
+	}, "\x00"))
+	cache, err := branchHypothesisCache(ctx, review.config, review.diff, review.ignorePatterns)
 	if err != nil {
 		logger.Warn("hypothesis cache scope unavailable", "error", err)
 	}
@@ -37,7 +41,8 @@ func (review hypothesisReview) hypotheses(
 		logger.Warn("hypothesis cache read failed", "error", err)
 	}
 	digest := hypothesisDigest(review.diff.Patch)
-	if previous.MergeBase == review.diff.MergeBase && previous.ContextDigest == review.contextDigest && previous.PatchDigest == digest {
+	if previous.Head == review.diff.Head && previous.MergeBase == review.diff.MergeBase &&
+		previous.ContextDigest == review.contextDigest && previous.PatchDigest == digest {
 		logger.Info("hypothesis cache reused unchanged diff", "hypotheses", len(previous.Hypotheses))
 		return previous.Hypotheses, fantasy.Usage{}, nil
 	}
@@ -118,19 +123,22 @@ func previousQuestions(hypotheses []Hypothesis) string {
 func mergeHypotheses(previous []Hypothesis, generated []Hypothesis, commit string) []Hypothesis {
 	merged := append([]Hypothesis(nil), previous...)
 	slugs := make(map[string]bool, len(previous))
-	questions := make(map[string]bool, len(previous))
+	questions := make(map[string]int, len(previous))
 	questionKey := func(hypothesis Hypothesis) string {
 		question := strings.ToLower(strings.Join(strings.Fields(hypothesis.Question), " "))
 		return strings.TrimSpace(hypothesis.At) + "\x00" + question
 	}
-	for _, hypothesis := range previous {
+	for i, hypothesis := range previous {
 		slugs[hypothesis.Slug] = true
-		questions[questionKey(hypothesis)] = true
+		questions[questionKey(hypothesis)] = i
 	}
 	for _, hypothesis := range generated {
 		question := questionKey(hypothesis)
 		slug := hypothesisSlug(hypothesis.Slug, hypothesis.Question)
-		if questions[question] {
+		if i, duplicate := questions[question]; duplicate {
+			if hypothesis.Look != "" {
+				merged[i].Look = hypothesis.Look
+			}
 			continue
 		}
 		base := slug
@@ -140,9 +148,9 @@ func mergeHypotheses(previous []Hypothesis, generated []Hypothesis, commit strin
 		hypothesis.ID = fmt.Sprintf("H%d", len(merged)+1)
 		hypothesis.Slug = slug
 		hypothesis.Commit = commit
-		merged = append(merged, hypothesis)
 		slugs[slug] = true
-		questions[question] = true
+		questions[question] = len(merged)
+		merged = append(merged, hypothesis)
 	}
 	return merged
 }

@@ -21,6 +21,7 @@ type ReviewRunConfig struct {
 	MaxDiffBytes        int
 	ModelName           string
 	HypothesisModelName string
+	GeneratorBackend    string
 	// HypothesisCheckModelName answers each hypothesis; empty uses ModelName.
 	HypothesisCheckModelName string
 	ReasoningEffort          string

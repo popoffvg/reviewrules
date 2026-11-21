@@ -142,6 +142,7 @@ func runReviewRules() int {
 		MaxDiffBytes:             config.Repo.MaxDiffBytes,
 		ModelName:                userConfig.Model,
 		HypothesisModelName:      userConfig.HypothesisModel,
+		GeneratorBackend:         string(userConfig.Agent),
 		HypothesisCheckModelName: userConfig.HypothesisCheckModel,
 		ReasoningEffort:          userConfig.ReasoningEffort,
 		RuleReasoningEffort:      userConfig.RuleReasoningEffort,

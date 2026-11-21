@@ -35,7 +35,7 @@ type hypothesisSnapshot struct {
 	Hypotheses    []Hypothesis `json:"hypotheses"`
 }
 
-func branchHypothesisCache(ctx context.Context, cfg ReviewRunConfig, diff ReviewDiff, ignorePatterns []string, templateDigest string) (hypothesisCache, error) {
+func branchHypothesisCache(ctx context.Context, cfg ReviewRunConfig, diff ReviewDiff, ignorePatterns []string) (hypothesisCache, error) {
 	if cfg.HypothesisCacheDir == "" {
 		return hypothesisCache{}, nil
 	}
@@ -61,9 +61,8 @@ func branchHypothesisCache(ctx context.Context, cfg ReviewRunConfig, diff Review
 	if err != nil {
 		return hypothesisCache{}, err
 	}
-	scope := []string{commonDir, prefix, branch, cfg.Base, templateDigest}
+	scope := []string{commonDir, prefix, branch, cfg.Base}
 	scope = append(scope, ignorePatterns...)
-	scope = append(scope, "", strings.Join(cfg.RunContext, "\x00"))
 	return hypothesisCache{
 		dir: cfg.HypothesisCacheDir, key: hypothesisDigest(strings.Join(scope, "\x00")),
 		maxBytes: hypothesisCacheBytes,
