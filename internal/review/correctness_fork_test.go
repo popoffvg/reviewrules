@@ -23,7 +23,7 @@ func TestGenerateHypothesesRejectsAnEmptyList(t *testing.T) {
 	}
 }
 
-func TestGenerateHypothesesAllowsAnEmptyListForACachedReview(t *testing.T) {
+func TestGenerateHypothesesAcceptsAnAllowedEmptyList(t *testing.T) {
 	got, _, err := GenerateHypothesesInFork(
 		t.Context(),
 		scriptForkAgent{text: `{"hypotheses": []}`},

@@ -140,6 +140,20 @@ func TestReviewHypothesesAcrossBranchRuns(t *testing.T) {
 	if len(batched.agent.checks) != 2 || len(batched.report.Correctness.HypothesisCheck) != maxHypotheses+2 {
 		t.Fatal("checker must verify the full ledger in batches")
 	}
+
+	index, err := openWorktreeIndex(t.Context(), repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if index.file == nil {
+		t.Fatal("expected an index for the test repository")
+	}
+	t.Cleanup(func() { _ = index.file.Close() })
+	runHypothesisGit(t, repo, "switch", "--detach", "HEAD~1")
+	runHypothesisGit(t, repo, "switch", firstBranch)
+	if err = index.checkUnchanged(); err == nil {
+		t.Fatal("worktree index comparison did not detect the two checkouts")
+	}
 }
 
 type hypothesisRun struct {

@@ -39,6 +39,16 @@ func LoadReviewDiff(
 
 	pathspec := reviewPathspec(ignorePatterns)
 	revisions := reviewRevisions(mergeBase, head, includeWorktree)
+	var index worktreeIndex
+	if includeWorktree {
+		index, err = openWorktreeIndex(ctx, repoRoot)
+		if err != nil {
+			return ReviewDiff{}, err
+		}
+		if index.file != nil {
+			defer func() { _ = index.file.Close() }()
+		}
+	}
 	raw, err := runReviewDiff(ctx, repoRoot, revisions, pathspec, "--raw", "-z", "--patch")
 	if err != nil {
 		return ReviewDiff{}, err
@@ -50,6 +60,10 @@ func LoadReviewDiff(
 		}
 		if currentHead != head {
 			return ReviewDiff{}, fmt.Errorf("review HEAD changed while reading the worktree diff: %s to %s", head, currentHead)
+		}
+		err = index.checkUnchanged()
+		if err != nil {
+			return ReviewDiff{}, err
 		}
 	}
 	names, patch := splitReviewDiff(raw)
@@ -95,7 +109,7 @@ func loadReviewPatch(ctx context.Context, repoRoot string, revisions []string, p
 }
 
 func runReviewDiff(ctx context.Context, repoRoot string, revisions []string, pathspec []string, flags ...string) (string, error) {
-	args := append([]string{"diff", "--no-color", "--no-ext-diff"}, flags...)
+	args := append([]string{"--no-optional-locks", "diff", "--no-color", "--no-ext-diff"}, flags...)
 	args = append(args, revisions...)
 	return runGit(ctx, repoRoot, append(args, pathspec...)...)
 }
