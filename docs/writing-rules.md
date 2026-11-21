@@ -41,4 +41,4 @@ rule_folders = [".team-rules"]
 
 Use [`[[rule_sets]]`](rule-sets.md) in `.reviewrules/settings.toml` to load a shared rule repository. Each set prefixes its rule IDs with its name, so findings keep their source.
 
-Use a linter for checks it can express reliably. Save LLM rules for decisions that need code context. The [find-lintable-rules skill](../coding-agent-plugin/skills/find-lintable-rules/SKILL.md) helps sort an existing rule set.
+Use a linter for checks it can express reliably. Save LLM rules for decisions that need code context. The [find-lintable-rules skill](https://github.com/popoffvg/reviewrules/blob/main/coding-agent-plugin/skills/find-lintable-rules/SKILL.md) helps sort an existing rule set.

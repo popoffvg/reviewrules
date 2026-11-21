@@ -15,8 +15,7 @@
     <div class="page-width header-content">
       <a class="brand" href="#top"><img src="review-mark.png" width="32" height="32" alt="">reviewrules</a>
       <nav aria-label="Main">
-        <a href="#pricing">Pricing</a>
-        <a href="https://github.com/popoffvg/reviewrules#quick-start" class="nav-guide">Quick start</a>
+        <a href="docs/index.html">Docs</a>
         <a href="https://github.com/popoffvg/reviewrules" class="github-link">GitHub</a>
       </nav>
     </div>
@@ -27,10 +26,10 @@
       <div>
         <p class="eyebrow"><span aria-hidden="true"></span> OPEN-SOURCE CODE REVIEW</p>
         <h1 id="product-title">Your code.<br><strong>Your rules.</strong></h1>
-        <p class="intro-description">Run code review with your existing subscription or use lower-cost models for rule checks. Share the same review rules across your team or company.</p>
+        <p class="intro-description">Run code review with your existing subscription. Check Git diffs against rules that your team or company shares.</p>
         <div class="intro-actions">
-          <a class="button primary-button" href="https://github.com/popoffvg/reviewrules#quick-start">Get started</a>
-          <a class="button secondary-button" href="#pricing">Compare pricing</a>
+          <a class="button primary-button" href="docs/index.html">Get started</a>
+          <a class="button secondary-button" href="https://github.com/popoffvg/reviewrules">View on GitHub</a>
         </div>
       </div>
       <figure class="review-artwork">
@@ -40,50 +39,29 @@
 
     <section class="review-features" aria-label="Why use reviewrules">
       <article>
-        <span class="feature-icon" aria-hidden="true">×</span>
-        <h2>Pay less for rule checks</h2>
-        <p>Choose a lower-cost model for rule checks and a separate model to look for bugs.</p>
-        <a class="text-link" href="#pricing">Compare model rates</a>
+        <span class="feature-icon" aria-hidden="true">±</span>
+        <h2>Get a verdict per rule</h2>
+        <p>Write rules in plain language. Each rule gets a verdict, and findings name the file and line.</p>
+        <a class="text-link" href="docs/writing-rules.html">Write review rules</a>
       </article>
       <article>
         <span class="feature-icon" aria-hidden="true">&gt;_</span>
         <h2>Use your subscription locally</h2>
         <p>Sign in to your local Codex or Claude Code CLI with your existing subscription. Reviews use your plan allowance.</p>
-        <a class="text-link" href="https://github.com/popoffvg/reviewrules/blob/main/docs/backends.md">Set up a local backend</a>
+        <a class="text-link" href="docs/backends.html">Set up a local backend</a>
       </article>
       <article>
         <span class="feature-icon" aria-hidden="true">✓</span>
         <h2>Share rules across teams</h2>
         <p>Keep company-wide rules in a shared Git repository. Each team can add its own rules and use both locally or in CI.</p>
-        <a class="text-link" href="https://github.com/popoffvg/reviewrules/blob/main/docs/rule-sets.md">Set up shared rule sets</a>
+        <a class="text-link" href="docs/rule-sets.html">Set up shared rule sets</a>
       </article>
-    </section>
-
-    <section id="pricing" class="pricing-section" aria-labelledby="pricing-title">
-      <div class="pricing-copy">
-        <p class="section-label">MODEL PRICING</p>
-        <h2 id="pricing-title">Pay less per token<br>for rule checks.</h2>
-        <p>Use Luna for rule checks and choose a separate model to propose possible bugs.</p>
-      </div>
-      <div class="pricing-comparison">
-        <dl class="price-rates">
-          <div>
-            <dt><strong>reviewrules rule checks</strong><span>GPT-6 Luna</span></dt>
-            <dd>1×</dd>
-          </div>
-          <div>
-            <dt><strong>Single Codex review</strong><span>GPT-6.1 Sol</span></dt>
-            <dd>20×</dd>
-          </div>
-        </dl>
-        <p class="price-note">Relative API rates for uncached input and output tokens. Total review cost depends on token use, caching, and model choice. <a href="https://developers.openai.com/api/docs/pricing">OpenAI API pricing</a></p>
-      </div>
     </section>
 
     <section class="install-section" aria-labelledby="install-title">
       <div>
         <h2 id="install-title">Review your next diff.</h2>
-        <a class="text-link" href="https://github.com/popoffvg/reviewrules#quick-start">Read the setup guide</a>
+        <a class="text-link" href="docs/index.html">Read the setup guide</a>
       </div>
       <pre aria-label="Install reviewrules"><code>go install github.com/popoffvg/reviewrules@latest</code></pre>
     </section>

@@ -66,7 +66,7 @@ These are example configurations. Model availability depends on your account and
 
 ## Run from Claude Code or Codex
 
-This repo is a plugin marketplace for Claude Code and for Codex. The plugin `reviewrules` gives the agent three skills: [run-reviewrules](../coding-agent-plugin/skills/run-reviewrules/SKILL.md) installs and runs reviewrules and reads its result, [create-agent-plugin](../coding-agent-plugin/skills/create-agent-plugin/SKILL.md) writes an exec agent plugin, and [find-lintable-rules](../coding-agent-plugin/skills/find-lintable-rules/SKILL.md) says which rules a linter can check instead of an LLM fork.
+This repo is a plugin marketplace for Claude Code and for Codex. The plugin `reviewrules` gives the agent three skills: [run-reviewrules](https://github.com/popoffvg/reviewrules/blob/main/coding-agent-plugin/skills/run-reviewrules/SKILL.md) installs and runs reviewrules and reads its result, [create-agent-plugin](https://github.com/popoffvg/reviewrules/blob/main/coding-agent-plugin/skills/create-agent-plugin/SKILL.md) writes an exec agent plugin, and [find-lintable-rules](https://github.com/popoffvg/reviewrules/blob/main/coding-agent-plugin/skills/find-lintable-rules/SKILL.md) says which rules a linter can check instead of an LLM fork.
 
 Claude Code:
 

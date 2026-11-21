@@ -4,7 +4,9 @@ on:
   push:
     branches: [main]
     paths:
+      - docs/**
       - site/**
+      - mkdocs.yml
       - .github/workflows/pages.yaml
   workflow_dispatch:
 
@@ -23,9 +25,18 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - name: Build documentation
+        run: |
+          python -m pip install mkdocs==1.6.1
+          mkdir -p .tmp/pages
+          cp -R site/. .tmp/pages/
+          python -m mkdocs build --strict
       - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
         with:
-          path: site
+          path: .tmp/pages
 
   deploy:
     needs: package

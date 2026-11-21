@@ -35,7 +35,7 @@ jobs:
           reviewrules --config "$RUNNER_TEMP/reviewrules.toml" --base "origin/$BASE_REF" --json-out review.json
 ```
 
-Replace `<sha or tag>` with a commit SHA or a tag of reviewrules, so that each run uses the same version. `actions/setup-go` puts `$(go env GOPATH)/bin` on `PATH`. Use commit-pinned actions, as in this repo's `.github/workflows/ci.yaml`. To run on a ChatGPT subscription instead, host the LiteLLM proxy near the runners ([shared proxy setup](../deploy/litellm/README.md)) and set `agent = "fantasy"` and `base_url = "<proxy>/v1"` in the `[ci]` case, with `LITELLM_API_KEY`. The job can also pass `--config` with a user config that the repo commits.
+Replace `<sha or tag>` with a commit SHA or a tag of reviewrules, so that each run uses the same version. `actions/setup-go` puts `$(go env GOPATH)/bin` on `PATH`. Use commit-pinned actions, as in this repo's `.github/workflows/ci.yaml`. To run on a ChatGPT subscription instead, host the LiteLLM proxy near the runners ([shared proxy setup](https://github.com/popoffvg/reviewrules/blob/main/deploy/litellm/README.md)) and set `agent = "fantasy"` and `base_url = "<proxy>/v1"` in the `[ci]` case, with `LITELLM_API_KEY`. The job can also pass `--config` with a user config that the repo commits.
 
 ## Keep the sessions
 

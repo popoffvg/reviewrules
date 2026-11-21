@@ -1,0 +1,35 @@
+site_name: reviewrules Docs
+site_url: https://popoffvg.github.io/reviewrules/docs/
+repo_url: https://github.com/popoffvg/reviewrules
+site_dir: .tmp/pages/docs
+use_directory_urls: false
+
+theme:
+  name: mkdocs
+  nav_style: primary
+  user_color_mode_toggle: true
+
+exclude_docs: |
+  /comparison.md
+  /comparison/
+
+validation:
+  links:
+    anchors: warn
+    unrecognized_links: warn
+
+nav:
+  - Home: https://popoffvg.github.io/reviewrules/
+  - Quick start: index.md
+  - Guides:
+      - Choose a backend: backends.md
+      - Write rules: writing-rules.md
+      - Share rule sets: rule-sets.md
+      - Run in CI: ci.md
+      - Read a review result: review-results.md
+  - Reference:
+      - Configuration: configuration.md
+      - How a review works: how-a-run-works.md
+      - LiteLLM: litellm.md
+      - Agent plugins: agent-plugins.md
+      - Agent plugin protocol: agent-plugin-protocol.md

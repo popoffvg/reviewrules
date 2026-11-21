@@ -24,6 +24,6 @@ In a second terminal, change to the repository you want to review and run:
 LITELLM_API_KEY="$(cat "${TMPDIR:-/tmp}/reviewrules-litellm.key")" reviewrules --base origin/main --worktree
 ```
 
-The tool sends one `litellm_session_id` per review so the ChatGPT backend can share the prompt cache across forks. For a shared proxy in CI see [the deployment guide](../deploy/litellm/README.md).
+The tool sends one `litellm_session_id` per review so the ChatGPT backend can share the prompt cache across forks. For a shared proxy in CI see [the deployment guide](https://github.com/popoffvg/reviewrules/blob/main/deploy/litellm/README.md).
 
 This route consumes your ChatGPT plan's Codex allowance. See [backend choices](backends.md) for local CLI and direct API alternatives.
