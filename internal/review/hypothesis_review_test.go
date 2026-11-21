@@ -147,6 +147,14 @@ type hypothesisRun struct {
 	agent  *hypothesisTestAgent
 }
 
+func TestMergeHypothesesKeepsCaseSensitiveQuestions(t *testing.T) {
+	previous := []Hypothesis{{Slug: "case-sensitive", At: "status.go:1", Question: `Does "READY" pass?`}}
+	generated := []Hypothesis{{Slug: "case-sensitive", At: "status.go:1", Question: `Does "ready" pass?`}}
+	if got := mergeHypotheses(previous, generated, "commit"); len(got) != 2 {
+		t.Fatalf("merged %d questions, want two case-sensitive questions", len(got))
+	}
+}
+
 func runHypothesisReview(t *testing.T, cfg ReviewRunConfig, generatorReply string) hypothesisRun {
 	t.Helper()
 	agent := &hypothesisTestAgent{reply: generatorReply}

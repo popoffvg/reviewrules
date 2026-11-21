@@ -27,11 +27,10 @@ func LoadReviewDiff(
 	ignorePatterns []string,
 	maxBytes int,
 ) (ReviewDiff, error) {
-	head, err := runGit(ctx, repoRoot, "rev-parse", "--verify", "HEAD")
+	head, err := reviewHeadCommit(ctx, repoRoot)
 	if err != nil {
 		return ReviewDiff{}, err
 	}
-	head = strings.TrimSpace(head)
 	mergeBase, err := runGit(ctx, repoRoot, "merge-base", base, head)
 	if err != nil {
 		return ReviewDiff{}, err
@@ -43,6 +42,15 @@ func LoadReviewDiff(
 	raw, err := runReviewDiff(ctx, repoRoot, revisions, pathspec, "--raw", "-z", "--patch")
 	if err != nil {
 		return ReviewDiff{}, err
+	}
+	if includeWorktree {
+		currentHead, err := reviewHeadCommit(ctx, repoRoot)
+		if err != nil {
+			return ReviewDiff{}, err
+		}
+		if currentHead != head {
+			return ReviewDiff{}, fmt.Errorf("review HEAD changed while reading the worktree diff: %s to %s", head, currentHead)
+		}
 	}
 	names, patch := splitReviewDiff(raw)
 	err = checkReviewPatchSize(patch, maxBytes)
@@ -56,6 +64,11 @@ func LoadReviewDiff(
 		Patch:        patch,
 		ChangedFiles: names,
 	}, nil
+}
+
+func reviewHeadCommit(ctx context.Context, repoRoot string) (string, error) {
+	head, err := runGit(ctx, repoRoot, "rev-parse", "--verify", "HEAD")
+	return strings.TrimSpace(head), err
 }
 
 func reviewRevisions(base string, head string, includeWorktree bool) []string {

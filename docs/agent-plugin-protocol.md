@@ -211,7 +211,7 @@ The request is one JSON object. Every field is in every request, except `session
 | `repo_root` | string | all | The absolute path of the repo under review. It is also the working directory of the process. |
 | `prompt_cache_key` | string | all | A key for the prompt cache: `reviewrules-` and 16 hex characters from a hash of the diff. It is the same in every request of a run. A backend that routes its cache by a key SHOULD send it. A plugin MAY also use it to name its session storage. |
 | `session_id` | string | `fork`, `append` | `fork`: the session to copy. `append`: the session to continue. Absent in `start-parent`. |
-| `hypotheses` | array | the checker `fork` | The hypothesis ledger. Each item has `id`, `hunt`, `at`, `question`, `look`, and optional `slug` and `commit` fields. The prompt contains the same rows. |
+| `hypotheses` | array | the checker `fork` | The [hypothesis ledger rows](../internal/hypothesis/review_hypothesis.go). The prompt contains the same rows. |
 
 Example of a version check in bash:
 

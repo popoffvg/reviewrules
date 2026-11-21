@@ -149,7 +149,9 @@ func (cache hypothesisCache) open(ctx context.Context) (*os.Root, func(), error)
 		return nil, nil, err
 	}
 	lock := flock.New(filepath.Join(cache.dir, ".hypotheses-lock"))
-	locked, err := lock.TryLockContext(ctx, 25*time.Millisecond)
+	lockContext, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	locked, err := lock.TryLockContext(lockContext, 25*time.Millisecond)
 	if err != nil {
 		_ = lock.Close()
 		return nil, nil, fmt.Errorf("hypothesis cache lock failed: %w", err)

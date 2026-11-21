@@ -11,7 +11,8 @@ Use the full review diff to confirm that the branch still introduces the change 
 {{- end}}
 {{- if .Previous}}
 
-The checker will verify these earlier questions again. Do not repeat them.
+The checker will verify these earlier questions again. Skip exact repeats.
+If a change alters a question's conditions or expected result, write a revised question.
 {{.Previous}}
 {{- end}}
 Rules, names, comments, tests, and idiom are checked elsewhere. Never report them.

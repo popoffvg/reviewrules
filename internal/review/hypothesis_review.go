@@ -128,8 +128,7 @@ func mergeHypotheses(previous []Hypothesis, generated []Hypothesis, commit strin
 	slugs := make(map[string]bool, len(previous))
 	questions := make(map[string]int, len(previous))
 	questionKey := func(hypothesis Hypothesis) string {
-		question := strings.ToLower(strings.Join(strings.Fields(hypothesis.Question), " "))
-		return strings.TrimSpace(hypothesis.At) + "\x00" + question
+		return strings.TrimSpace(hypothesis.At) + "\x00" + strings.TrimSpace(hypothesis.Question)
 	}
 	for i, hypothesis := range previous {
 		slugs[hypothesis.Slug] = true
