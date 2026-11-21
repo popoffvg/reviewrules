@@ -157,8 +157,7 @@ func (*hypothesisTestAgent) StartParentSession(context.Context, string, ForkSett
 func (agent *hypothesisTestAgent) ForkParentSession(_ context.Context, prompt string, _ ForkSettings) (ForkReply, error) {
 	agent.lock.Lock()
 	defer agent.lock.Unlock()
-	switch {
-	case strings.HasPrefix(prompt, "# New task: write correctness hypotheses"):
+	if strings.HasPrefix(prompt, "# New task: write correctness hypotheses") {
 		agent.generators = append(agent.generators, prompt)
 		if agent.reply != "" {
 			return ForkReply{Text: hypothesisJSON(agent.reply), Usage: fantasy.Usage{InputTokens: 1}}, nil
