@@ -32,6 +32,7 @@ type ReviewRunConfig struct {
 	ParentMaxSteps     int
 	ForkMaxSteps       int
 	CorrectnessEnabled bool
+	HypothesisCacheDir string
 	// RuleFolders are the rule folder names that the repo settings add to .reviewrules.
 	RuleFolders []string
 	// RuleSets are the fetched rule sets, in the order of the rule_sets list.
@@ -86,6 +87,7 @@ func RunReview(
 		return report, err
 	}
 	report.ChangedFiles = diff.ChangedFiles
+	report.Commit = diff.Head
 	if len(diff.ChangedFiles) == 0 {
 		return report, fmt.Errorf("review diff is empty between %s and HEAD", cfg.Base)
 	}
@@ -159,19 +161,16 @@ func RunReview(
 	report.Correctness.Enabled = cfg.CorrectnessEnabled
 	if cfg.CorrectnessEnabled {
 		wait.Go(func() {
-			limit <- struct{}{}
-			hypotheses, usage, err := GenerateHypothesesInFork(ctx, agent, generatorSettings, text)
-			<-limit
+			review := hypothesisReview{config: cfg, diff: diff, ignorePatterns: catalog.IgnorePatterns}
+			hypotheses, usage, err := review.hypotheses(ctx, logger, agent, limit, generatorSettings, text)
 			lock.Lock()
 			report.Correctness.GeneratorUsage = usage
 			if err != nil {
 				report.Correctness.GeneratorError = err.Error()
 			}
 			lock.Unlock()
-			logger.Info("review hypothesis generator done", "hypotheses", len(hypotheses), "usage", usage.String())
-
 			var checks []HypothesisCheck
-			if err == nil {
+			if len(hypotheses) > 0 {
 				limit <- struct{}{}
 				checks = CheckHypothesesInFork(ctx, agent, checkSettings, hypotheses, text)
 				<-limit

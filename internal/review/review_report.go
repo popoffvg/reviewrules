@@ -11,6 +11,7 @@ import (
 // ReviewReport is the JSON a run writes. Rules skipped by scope are listed by id, not checked.
 type ReviewReport struct {
 	Base                 string `json:"base"`
+	Commit               string `json:"commit,omitempty"`
 	Model                string `json:"model"`
 	HypothesisModel      string `json:"hypothesis_model"`
 	HypothesisCheckModel string `json:"hypothesis_check_model"`

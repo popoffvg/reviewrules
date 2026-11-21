@@ -64,9 +64,11 @@ type RuleCheckInput struct {
 	Text     string
 }
 
-// HypothesisGeneratorInput is the cap on the hypotheses one generator fork writes.
+// HypothesisGeneratorInput scopes new questions to the branch delta when available.
 type HypothesisGeneratorInput struct {
 	MaxHypotheses int
+	Delta         string
+	Previous      string
 }
 
 // HypothesisCheckInput is the ledger one checker fork answers.
@@ -77,6 +79,8 @@ type HypothesisCheckInput struct {
 // HypothesisCheckItem is one row of the checker prompt, the same row as the protocol hypotheses field.
 type HypothesisCheckItem struct {
 	ID       string
+	Slug     string
+	Commit   string
 	Hunt     string
 	At       string
 	Question string

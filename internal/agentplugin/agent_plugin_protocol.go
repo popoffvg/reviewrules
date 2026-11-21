@@ -44,6 +44,8 @@ type PluginRequest struct {
 // HypothesisLedgerItem is one row of the checker fork's hypotheses field.
 type HypothesisLedgerItem struct {
 	ID       string `json:"id"`
+	Slug     string `json:"slug,omitempty"`
+	Commit   string `json:"commit,omitempty"`
 	Hunt     string `json:"hunt"`
 	At       string `json:"at"`
 	Question string `json:"question"`

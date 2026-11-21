@@ -27,6 +27,8 @@ const (
 // Hypothesis is one yes/no question about the diff; YES means a defect at At.
 type Hypothesis struct {
 	ID       string `json:"id"`
+	Slug     string `json:"slug,omitempty"`
+	Commit   string `json:"commit,omitempty"`
 	Hunt     string `json:"hunt"`
 	At       string `json:"at"`
 	Question string `json:"question"`
@@ -62,8 +64,10 @@ func GenerateHypothesesInFork(
 	agent ReviewForkAgent,
 	settings ForkSettings,
 	text prompts.Set,
+	input prompts.HypothesisGeneratorInput,
 ) ([]Hypothesis, fantasy.Usage, error) {
-	prompt := text.HypothesisGenerator(prompts.HypothesisGeneratorInput{MaxHypotheses: maxHypotheses})
+	input.MaxHypotheses = maxHypotheses
+	prompt := text.HypothesisGenerator(input)
 	fork, err := agent.ForkParentSession(ctx, prompt, settings)
 	if err != nil {
 		return nil, fantasy.Usage{}, fmt.Errorf("hypothesis generator fork failed: %w", err)
@@ -75,7 +79,7 @@ func GenerateHypothesesInFork(
 		return nil, usage, fmt.Errorf("hypothesis generator reply: %w", err)
 	}
 	hypotheses := reply.Hypotheses
-	if len(hypotheses) == 0 {
+	if len(hypotheses) == 0 && input.Delta == "" && input.Previous == "" {
 		return nil, usage, fmt.Errorf("hypothesis generator reply: hypotheses list is empty")
 	}
 	if len(hypotheses) > maxHypotheses {
@@ -118,6 +122,8 @@ func CheckHypothesesInFork(
 func hypothesisCheckItem(hypothesis Hypothesis) prompts.HypothesisCheckItem {
 	return prompts.HypothesisCheckItem{
 		ID:       hypothesis.ID,
+		Slug:     hypothesis.Slug,
+		Commit:   hypothesis.Commit,
 		Hunt:     hypothesis.Hunt,
 		At:       hypothesis.At,
 		Question: hypothesis.Question,

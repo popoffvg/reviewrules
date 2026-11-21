@@ -1,9 +1,22 @@
 # New task: write correctness hypotheses
 
 Answer one question: for which input does the changed code give a wrong result?
+{{- if .Delta}}
+Write new questions only for behavior affected by the delta below.
+Use the full review diff to confirm that the branch still introduces the change in question.
+
+```diff
+{{.Delta}}
+```
+{{- end}}
+{{- if .Previous}}
+
+The checker will verify these earlier questions again. Do not repeat them.
+{{.Previous}}
+{{- end}}
 Rules, names, comments, tests, and idiom are checked elsewhere. Never report them.
 
-Walk these hunts over every hunk:
+Walk these hunts over every hunk in scope:
 | Hunt | Look for |
 |---|---|
 | Boundaries | off-by-one, inclusive vs exclusive end, empty collection, first and last item |
@@ -16,13 +29,18 @@ Walk these hunts over every hunk:
 | Misuse | the likely caller mistake with a new value (`>` for `>=`, a stale value, a value of another owner), and whether it fails as a skip or as a duplicate |
 
 Walk every hunt before you answer. Look for an input that makes the changed code give a wrong result.
+{{- if or .Delta .Previous}}
+Return an empty list if you cannot identify a new question in scope.
+{{- else}}
 Do not stop because nothing looks suspect, and do not return an empty list.
+{{- end}}
 Each place the code may be wrong becomes one yes/no question whose YES is a defect.
 At most {{.MaxHypotheses}}. Prefer a silent wrong result over a loud failure. Merge two questions about one code path.
-Use only the diff already in the conversation. Do not open a file. Do not answer the questions; other agents will.
+Use only the diff in this conversation. Do not open a file. Do not answer the questions.
+Give each question a short kebab-case slug that names the suspected defect. Leave line numbers and commit hashes out of the slug.
 Reply with one json block and nothing else.
 
 End with this JSON block:
 ```json
-{"hypotheses": [{"id": "H1", "hunt": "Boundaries", "at": "file:line", "question": "yes/no question, yes = defect", "look": "the outermost caller (entry point) first, then the files and symbols that hold the answer"}]}
+{"hypotheses": [{"slug": "empty-input-skips-validation", "hunt": "Boundaries", "at": "file:line", "question": "yes/no question, yes = defect", "look": "the entry point, then the files and symbols that show the answer"}]}
 ```

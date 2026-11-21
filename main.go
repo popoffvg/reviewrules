@@ -126,6 +126,15 @@ func runReviewRules() int {
 		logger.Info("reviewrules rule dirs skipped: no .reviewrules/config.json", "dirs", skippedRuleDirs)
 	}
 	ruleSets = append(ruleSets, localRuleSets...)
+	var hypothesisCacheDir string
+	if config.Repo.Correctness {
+		home, homeErr := os.UserHomeDir()
+		if homeErr != nil {
+			logger.Warn("hypothesis cache home unavailable", "error", homeErr)
+		} else {
+			hypothesisCacheDir = filepath.Join(home, ".reviewrules", "cache")
+		}
+	}
 	report, err := review.RunReview(ctx, logger, newAgent, review.ReviewRunConfig{
 		RepoRoot:                 root,
 		Base:                     options.Base,
@@ -143,6 +152,7 @@ func runReviewRules() int {
 		ParentMaxSteps:           userConfig.ParentSteps,
 		ForkMaxSteps:             userConfig.ForkSteps,
 		CorrectnessEnabled:       config.Repo.Correctness,
+		HypothesisCacheDir:       hypothesisCacheDir,
 		Prompts:                  agentPrompts,
 		RunContext:               options.Context,
 	})

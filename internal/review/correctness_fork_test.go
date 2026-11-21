@@ -16,6 +16,7 @@ func TestGenerateHypothesesRejectsAnEmptyList(t *testing.T) {
 		scriptForkAgent{text: `{"hypotheses": []}`},
 		ForkSettings{},
 		prompts.Default(),
+		prompts.HypothesisGeneratorInput{},
 	)
 	if err == nil || !strings.Contains(err.Error(), "hypotheses list is empty") {
 		t.Fatalf("error = %v; want hypotheses list is empty", err)
@@ -66,6 +67,7 @@ func TestGenerateHypothesesKeepsOneHypothesis(t *testing.T) {
 		scriptForkAgent{text: `{"hypotheses": [{"id": "H1", "hunt": "Boundaries", "at": "a.go:1", "question": "Does the last second overflow?", "look": "snapid.go"}]}`},
 		ForkSettings{},
 		prompts.Default(),
+		prompts.HypothesisGeneratorInput{},
 	)
 	if err != nil {
 		t.Fatal(err)

@@ -37,8 +37,10 @@ With `CI=true` and no `--json-out`, the report goes to stdout. Whenever JSON tak
 
 The correctness usage is available as `correctness.generator_usage`, `correctness.check_usage`, and `correctness.usage`. `cost_estimate.per_part_usd.correctness` holds its cost. `cost_estimate.parts` has one row per part and model. `total_usage` and `cost_estimate.total_usd` cover the whole run.
 
+The report's `commit` identifies the current review. Each hypothesis has a `slug` and a `commit` that identifies its original HEAD.
+
 ## Correctness check
 
-The correctness check runs by default. One generator fork writes up to 10 yes/no questions about bugs the diff could cause. Each question gets a separate checker fork, which reads the parent session rather than the generator's history.
+The correctness check runs by default. One checker fork verifies the earlier and new questions against the current diff. Each question that stays `UNSURE` gets a separate check.
 
-This adds up to 11 forks. Choose the generator and checker models separately with `hypothesis_model` and `hypothesis_check_model`. To turn correctness off, set `correctness = false` in `.reviewrules/settings.toml`. See [how a run works](how-a-run-works.md) for the full sequence.
+Choose the generator and checker models separately with `hypothesis_model` and `hypothesis_check_model`. To turn correctness off, set `correctness = false` in `.reviewrules/settings.toml`. See [the hypothesis cache](how-a-run-works.md#hypothesis-cache) for when a run can skip generation.

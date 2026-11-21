@@ -80,6 +80,8 @@ func hypothesisLedger(hypotheses []review.Hypothesis) []HypothesisLedgerItem {
 	for index, hypothesis := range hypotheses {
 		rows[index] = HypothesisLedgerItem{
 			ID:       hypothesis.ID,
+			Slug:     hypothesis.Slug,
+			Commit:   hypothesis.Commit,
 			Hunt:     hypothesis.Hunt,
 			At:       hypothesis.At,
 			Question: hypothesis.Question,

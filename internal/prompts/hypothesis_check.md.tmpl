@@ -3,9 +3,17 @@
 Answer every row. A row you skip is not an answer. Yes means that row's code has the defect. A different defect is not yours; leave it out.
 The diff is already in the conversation. Do not open a file to re-read a line the diff shows. When the answer depends on who calls the code at At (a hook, a callback, a release, a cleanup), search for its callers and read each one up to the entry point (an API handler, a loop, main).
 Do not write the steps. Reply with one json block and nothing else.
+If a location has moved, find it in the current diff or use the symbols in Look.
+If the current diff removes a suspect change or leaves it outside the review, cite that evidence and return REFUTED.
 
 {{range .Hypotheses}}
 Id: {{.ID}}
+{{- if .Slug}}
+Slug: {{.Slug}}
+{{- end}}
+{{- if .Commit}}
+Question first recorded at HEAD: {{.Commit}}
+{{- end}}
 Hunt: {{.Hunt}}
 At: {{.At}}
 Question: {{.Question}}
