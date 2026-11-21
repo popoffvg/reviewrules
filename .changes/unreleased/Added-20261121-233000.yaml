@@ -1,3 +1,0 @@
-kind: Added
-body: Same-branch reviews reuse hypotheses by slug and commit in a 200 MB cache, and verify them against the current diff.
-time: 2026-11-21T23:30:00+01:00
