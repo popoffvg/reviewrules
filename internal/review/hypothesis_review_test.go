@@ -56,7 +56,7 @@ func TestReviewHypothesesAcrossBranchRuns(t *testing.T) {
 	}
 
 	writeHypothesisFile(t, repo, "second.txt", "second-branch-change\n")
-	next := runHypothesisReview(t, cfg, `{"hypotheses":[{"slug":"first-defect","question":"Can the first change fail?"},{"slug":"first-defect","at":"second.txt:1","question":"Can the second change fail?"}]}`)
+	next := runHypothesisReview(t, cfg, `{"hypotheses":[{"slug":"first-defect","at":"first.txt:1","question":"Can the first change fail?"},{"slug":"first-defect","at":"second.txt:1","question":"Can the first change fail?"}]}`)
 	if len(next.agent.generators) != 1 || len(next.agent.checks) != 1 || len(next.report.Correctness.HypothesisCheck) != 2 {
 		t.Fatalf("next review launched %d generators and %d checks", len(next.agent.generators), len(next.agent.checks))
 	}

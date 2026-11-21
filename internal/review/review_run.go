@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"slices"
 	"sync"
 
 	"github.com/popoffvg/reviewrules/internal/prompts"
@@ -176,11 +175,7 @@ func RunReview(
 			lock.Unlock()
 			var checks []HypothesisCheck
 			if len(hypotheses) > 0 {
-				for batch := range slices.Chunk(hypotheses, maxHypotheses) {
-					limit <- struct{}{}
-					checks = append(checks, CheckHypothesesInFork(ctx, agent, checkSettings, batch, text)...)
-					<-limit
-				}
+				checks = checkHypothesisBatches(ctx, agent, limit, checkSettings, hypotheses, text)
 				logger.Info("review hypothesis ledger done", "hypotheses", len(checks))
 				var recheck sync.WaitGroup
 				for index := range checks {

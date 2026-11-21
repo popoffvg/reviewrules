@@ -22,3 +22,5 @@ The cache scopes questions to a Git repository, branch, review base, generator p
 An unchanged diff skips the generator. After a commit, the generator focuses on the changes since the last cached review. A new merge base, a changed dirty snapshot, or a detached HEAD uses the full diff.
 
 The cache stores questions in `~/.reviewrules/cache` and removes the least recently used entries first when it needs space. Every run verifies the questions against the current diff.
+
+If a branch's questions exceed the cache budget, the cache drops that branch's entry. The next run generates from the full diff.

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
+	"sync"
 
 	"charm.land/fantasy"
 	"github.com/popoffvg/reviewrules/internal/prompts"
@@ -26,7 +27,7 @@ func (review hypothesisReview) hypotheses(
 	settings ForkSettings,
 	text prompts.Set,
 ) ([]Hypothesis, fantasy.Usage, error) {
-	template := text.HypothesisGenerator(prompts.HypothesisGeneratorInput{MaxHypotheses: maxHypotheses})
+	template := hypothesisGeneratorPrompt(text, prompts.HypothesisGeneratorInput{})
 	cache, err := branchHypothesisCache(ctx, review.config, review.diff, review.ignorePatterns, hypothesisDigest(template))
 	if err != nil {
 		logger.Warn("hypothesis cache scope unavailable", "error", err)
@@ -63,6 +64,24 @@ func (review hypothesisReview) hypotheses(
 	return hypotheses, usage, nil
 }
 
+func checkHypothesisBatches(
+	ctx context.Context, agent ReviewForkAgent, limit chan struct{}, settings ForkSettings,
+	hypotheses []Hypothesis, text prompts.Set,
+) []HypothesisCheck {
+	checks := make([]HypothesisCheck, len(hypotheses))
+	var wait sync.WaitGroup
+	for start := 0; start < len(hypotheses); start += maxHypotheses {
+		end := min(start+maxHypotheses, len(hypotheses))
+		wait.Go(func() {
+			limit <- struct{}{}
+			defer func() { <-limit }()
+			copy(checks[start:end], CheckHypothesesInFork(ctx, agent, settings, hypotheses[start:end], text))
+		})
+	}
+	wait.Wait()
+	return checks
+}
+
 func (review hypothesisReview) delta(ctx context.Context, previous hypothesisSnapshot) string {
 	if previous.MergeBase != review.diff.MergeBase || previous.ContextDigest != review.contextDigest {
 		return ""
@@ -87,7 +106,7 @@ func previousQuestions(hypotheses []Hypothesis) string {
 	var questions strings.Builder
 	for i := len(hypotheses) - 1; i >= 0; i-- {
 		hypothesis := hypotheses[i]
-		item := fmt.Sprintf("- %s: %s\n", hypothesis.Slug, hypothesis.Question)
+		item := fmt.Sprintf("- %s at %s: %s\n", hypothesis.Slug, hypothesis.At, hypothesis.Question)
 		if questions.Len()+len(item) > contextBytes {
 			break
 		}
@@ -100,16 +119,17 @@ func mergeHypotheses(previous []Hypothesis, generated []Hypothesis, commit strin
 	merged := append([]Hypothesis(nil), previous...)
 	slugs := make(map[string]bool, len(previous))
 	questions := make(map[string]bool, len(previous))
-	questionKey := func(question string) string {
-		return strings.ToLower(strings.Join(strings.Fields(question), " "))
+	questionKey := func(hypothesis Hypothesis) string {
+		question := strings.ToLower(strings.Join(strings.Fields(hypothesis.Question), " "))
+		return strings.TrimSpace(hypothesis.At) + "\x00" + question
 	}
 	for _, hypothesis := range previous {
 		slugs[hypothesis.Slug] = true
-		questions[questionKey(hypothesis.Question)] = true
+		questions[questionKey(hypothesis)] = true
 	}
 	for _, hypothesis := range generated {
-		question := questionKey(hypothesis.Question)
-		slug := hypothesisSlug(hypothesis.Slug, question)
+		question := questionKey(hypothesis)
+		slug := hypothesisSlug(hypothesis.Slug, hypothesis.Question)
 		if questions[question] {
 			continue
 		}

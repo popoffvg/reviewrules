@@ -2,6 +2,7 @@ package review
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -26,7 +27,7 @@ const (
 
 // Hypothesis is one yes/no question about the diff; YES means a defect at At.
 type Hypothesis struct {
-	ID       string `json:"id"`
+	ID       string `json:"id,omitempty"`
 	Slug     string `json:"slug,omitempty"`
 	Commit   string `json:"commit,omitempty"`
 	Hunt     string `json:"hunt"`
@@ -51,6 +52,23 @@ type hypothesisListReply struct {
 	Hypotheses []Hypothesis `json:"hypotheses"`
 }
 
+var hypothesisExample = func() string {
+	data, err := json.Marshal(hypothesisListReply{Hypotheses: []Hypothesis{{
+		Slug: "empty-input-skips-validation", Hunt: "Boundaries", At: "file:line",
+		Question: "Does empty input skip validation?", Look: "the entry point and the validation function",
+	}}})
+	if err != nil {
+		panic(err)
+	}
+	return string(data)
+}()
+
+func hypothesisGeneratorPrompt(text prompts.Set, input prompts.HypothesisGeneratorInput) string {
+	input.MaxHypotheses = maxHypotheses
+	input.Example = hypothesisExample
+	return text.HypothesisGenerator(input)
+}
+
 type hypothesisCheckReply struct {
 	Verdict  HypothesisVerdict `json:"verdict"`
 	Evidence []string          `json:"evidence"`
@@ -66,8 +84,7 @@ func GenerateHypothesesInFork(
 	text prompts.Set,
 	input prompts.HypothesisGeneratorInput,
 ) ([]Hypothesis, fantasy.Usage, error) {
-	input.MaxHypotheses = maxHypotheses
-	prompt := text.HypothesisGenerator(input)
+	prompt := hypothesisGeneratorPrompt(text, input)
 	fork, err := agent.ForkParentSession(ctx, prompt, settings)
 	if err != nil {
 		return nil, fantasy.Usage{}, fmt.Errorf("hypothesis generator fork failed: %w", err)

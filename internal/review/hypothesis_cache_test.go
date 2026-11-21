@@ -52,6 +52,13 @@ func TestHypothesisCacheEvictsBySizeAndUse(t *testing.T) {
 	if _, stamp := readHypothesisSnapshot(t, caches[2]); stamp == "" {
 		t.Fatal("oversized snapshot evicted an existing entry")
 	}
+	err = caches[0].save(t.Context(), firstStamp, oversize)
+	if err == nil {
+		t.Fatal("oversized replacement did not report an error")
+	}
+	if _, stamp := readHypothesisSnapshot(t, caches[0]); stamp != "" {
+		t.Fatal("oversized replacement kept a stale snapshot")
+	}
 }
 
 func TestHypothesisCacheRejectsStaleWrite(t *testing.T) {

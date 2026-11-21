@@ -104,9 +104,6 @@ func (cache hypothesisCache) save(ctx context.Context, expected string, snapshot
 	if err != nil {
 		return err
 	}
-	if int64(len(data)) > cache.maxBytes {
-		return fmt.Errorf("hypothesis snapshot exceeds the cache budget: %d bytes", len(data))
-	}
 	root, closeCache, err := cache.open(ctx)
 	if err != nil {
 		return err
@@ -115,6 +112,13 @@ func (cache hypothesisCache) save(ctx context.Context, expected string, snapshot
 	_, current, err := cache.read(root)
 	if err != nil || current != expected {
 		return err
+	}
+	if int64(len(data)) > cache.maxBytes {
+		var removeErr error
+		if current != "" {
+			removeErr = root.Remove(cache.fileName())
+		}
+		return errors.Join(fmt.Errorf("hypothesis snapshot exceeds the cache budget: %d bytes", len(data)), removeErr)
 	}
 	const pending = ".hypotheses-pending"
 	err = root.Remove(pending)

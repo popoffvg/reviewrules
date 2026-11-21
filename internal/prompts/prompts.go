@@ -69,6 +69,7 @@ type HypothesisGeneratorInput struct {
 	MaxHypotheses int
 	Delta         string
 	Previous      string
+	Example       string
 }
 
 // HypothesisCheckInput is the ledger one checker fork answers.
