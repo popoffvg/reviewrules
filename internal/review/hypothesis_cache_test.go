@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/popoffvg/reviewrules/internal/digest"
 )
 
 func TestHypothesisCacheEvictsBySizeAndUse(t *testing.T) {
@@ -21,7 +23,7 @@ func TestHypothesisCacheEvictsBySizeAndUse(t *testing.T) {
 	}
 	var caches []hypothesisCache
 	for _, branch := range []string{"first", "second", "third", "large"} {
-		caches = append(caches, hypothesisCache{dir: dir, key: hypothesisDigest(branch), maxBytes: 2 * int64(len(data))})
+		caches = append(caches, hypothesisCache{dir: dir, key: digest.SHA256Hex(branch), maxBytes: 2 * int64(len(data))})
 	}
 	for i, cache := range caches[:2] {
 		saveHypothesisSnapshot(t, cache, "", snapshot)
@@ -62,7 +64,7 @@ func TestHypothesisCacheEvictsBySizeAndUse(t *testing.T) {
 }
 
 func TestHypothesisCacheRejectsStaleWrite(t *testing.T) {
-	cache := hypothesisCache{dir: t.TempDir(), key: hypothesisDigest("branch"), maxBytes: hypothesisCacheBytes}
+	cache := hypothesisCache{dir: t.TempDir(), key: digest.SHA256Hex("branch"), maxBytes: hypothesisCacheBytes}
 	first := hypothesisSnapshot{Head: strings.Repeat("a", 40), MergeBase: strings.Repeat("b", 40)}
 	saveHypothesisSnapshot(t, cache, "", first)
 	_, stamp := readHypothesisSnapshot(t, cache)

@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"charm.land/fantasy"
+	"github.com/popoffvg/reviewrules/internal/digest"
 	"github.com/popoffvg/reviewrules/internal/prompts"
 )
 
@@ -29,7 +30,7 @@ func (review hypothesisReview) hypotheses(
 	text prompts.Set,
 ) ([]Hypothesis, fantasy.Usage, error) {
 	template := hypothesisGeneratorPrompt(text, prompts.HypothesisGeneratorInput{})
-	review.contextDigest = hypothesisDigest(strings.Join([]string{
+	review.contextDigest = digest.SHA256Hex(strings.Join([]string{
 		review.contextDigest, template, review.config.GeneratorBackend,
 		settings.Model, settings.ReasoningEffort, strconv.Itoa(settings.MaxSteps),
 	}, "\x00"))
@@ -41,9 +42,9 @@ func (review hypothesisReview) hypotheses(
 	if err != nil {
 		logger.Warn("hypothesis cache read failed", "error", err)
 	}
-	digest := hypothesisDigest(review.diff.Patch)
+	patchDigest := digest.SHA256Hex(review.diff.Patch)
 	if previous.Head == review.diff.Head && previous.MergeBase == review.diff.MergeBase &&
-		previous.ContextDigest == review.contextDigest && previous.PatchDigest == digest {
+		previous.ContextDigest == review.contextDigest && previous.PatchDigest == patchDigest {
 		logger.Info("hypothesis cache reused unchanged diff", "hypotheses", len(previous.Hypotheses))
 		return previous.Hypotheses, fantasy.Usage{}, nil
 	}
@@ -62,7 +63,7 @@ func (review hypothesisReview) hypotheses(
 	}
 	hypotheses := mergeHypotheses(previous.Hypotheses, generated, review.diff.Head)
 	err = cache.save(ctx, stamp, hypothesisSnapshot{
-		Head: review.diff.Head, MergeBase: review.diff.MergeBase, PatchDigest: digest,
+		Head: review.diff.Head, MergeBase: review.diff.MergeBase, PatchDigest: patchDigest,
 		ContextDigest: review.contextDigest, Worktree: review.config.IncludeWorktree, Hypotheses: hypotheses,
 	})
 	if err != nil {
@@ -97,7 +98,7 @@ func (review hypothesisReview) delta(ctx context.Context, previous hypothesisSna
 	pathspec := reviewPathspec(review.ignorePatterns)
 	if previous.Worktree {
 		committedPatch, err := loadReviewPatch(ctx, cfg.RepoRoot, []string{previous.MergeBase, previous.Head}, pathspec, cfg.MaxDiffBytes)
-		if err != nil || hypothesisDigest(committedPatch) != previous.PatchDigest {
+		if err != nil || digest.SHA256Hex(committedPatch) != previous.PatchDigest {
 			return ""
 		}
 	}
@@ -167,7 +168,7 @@ func hypothesisSlug(slug string, question string) string {
 		slugWords = words(question)
 	}
 	if len(slugWords) == 0 {
-		return hypothesisDigest(question)[:16]
+		return digest.SHA256Hex(question)[:16]
 	}
 	return strings.Join(slugWords, "-")
 }

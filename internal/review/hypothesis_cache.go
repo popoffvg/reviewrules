@@ -16,9 +16,11 @@ import (
 	"time"
 
 	"github.com/gofrs/flock"
+	"github.com/popoffvg/reviewrules/internal/digest"
 )
 
 const hypothesisCacheBytes = 200_000_000
+const hypothesisCacheSuffix = ".hypotheses.json"
 
 type hypothesisCache struct {
 	dir      string
@@ -48,15 +50,15 @@ func branchHypothesisCache(ctx context.Context, cfg ReviewRunConfig, diff Review
 		return hypothesisCache{}, err
 	}
 	branch = strings.TrimSpace(branch)
-	head, err := runGit(ctx, cfg.RepoRoot, "rev-parse", "--verify", branch)
-	if err != nil || strings.TrimSpace(head) != diff.Head {
-		return hypothesisCache{}, err
-	}
-	location, err := runGit(ctx, cfg.RepoRoot, "rev-parse", "--path-format=absolute", "--git-common-dir", "--show-prefix")
+	location, err := runGit(ctx, cfg.RepoRoot, "rev-parse", "--path-format=absolute", "--git-common-dir", "--show-prefix", branch)
 	if err != nil {
 		return hypothesisCache{}, err
 	}
-	commonDir, prefix, _ := strings.Cut(location, "\n")
+	fields := strings.SplitN(strings.TrimSuffix(location, "\n"), "\n", 3)
+	if len(fields) != 3 || fields[2] != diff.Head {
+		return hypothesisCache{}, nil
+	}
+	commonDir, prefix := fields[0], fields[1]
 	commonDir, err = filepath.EvalSymlinks(commonDir)
 	if err != nil {
 		return hypothesisCache{}, err
@@ -64,7 +66,7 @@ func branchHypothesisCache(ctx context.Context, cfg ReviewRunConfig, diff Review
 	scope := []string{commonDir, prefix, branch, cfg.Base}
 	scope = append(scope, ignorePatterns...)
 	return hypothesisCache{
-		dir: cfg.HypothesisCacheDir, key: hypothesisDigest(strings.Join(scope, "\x00")),
+		dir: cfg.HypothesisCacheDir, key: digest.SHA256Hex(strings.Join(scope, "\x00")),
 		maxBytes: hypothesisCacheBytes,
 	}, nil
 }
@@ -186,7 +188,7 @@ func (cache hypothesisCache) read(root *os.Root) ([]byte, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	stamp := hypothesisDigest(string(data))
+	stamp := digest.SHA256Hex(string(data))
 	return data, stamp, nil
 }
 
@@ -198,7 +200,7 @@ func (cache hypothesisCache) evict(root *os.Root, incoming int64) error {
 	var entries []fs.FileInfo
 	total := incoming
 	for _, file := range files {
-		key, entry := strings.CutSuffix(file.Name(), ".hypotheses.json")
+		key, entry := strings.CutSuffix(file.Name(), hypothesisCacheSuffix)
 		if !entry || len(key) != sha256.Size*2 || file.Name() == cache.fileName() {
 			continue
 		}
@@ -229,12 +231,7 @@ func (cache hypothesisCache) evict(root *os.Root, incoming int64) error {
 }
 
 func (cache hypothesisCache) fileName() string {
-	return cache.key + ".hypotheses.json"
-}
-
-func hypothesisDigest(text string) string {
-	digest := sha256.Sum256([]byte(text))
-	return hex.EncodeToString(digest[:])
+	return cache.key + hypothesisCacheSuffix
 }
 
 func isGitCommit(commit string) bool {

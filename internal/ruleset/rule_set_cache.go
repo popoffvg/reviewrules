@@ -3,8 +3,6 @@ package ruleset
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"os"
@@ -12,6 +10,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/popoffvg/reviewrules/internal/digest"
 )
 
 // RuleSetCheckout is a rule set checked out at one commit in the cache.
@@ -89,12 +89,7 @@ type ruleSetCache struct {
 }
 
 func newRuleSetCache(cacheDir string, url string) ruleSetCache {
-	return ruleSetCache{dir: filepath.Join(cacheDir, sha256Hex(url))}
-}
-
-func sha256Hex(text string) string {
-	sum := sha256.Sum256([]byte(text))
-	return hex.EncodeToString(sum[:])
+	return ruleSetCache{dir: filepath.Join(cacheDir, digest.SHA256Hex(url))}
 }
 
 func (c ruleSetCache) gitDir() string { return filepath.Join(c.dir, "git") }
@@ -102,7 +97,9 @@ func (c ruleSetCache) gitDir() string { return filepath.Join(c.dir, "git") }
 func (c ruleSetCache) commitDir(commit string) string { return filepath.Join(c.dir, "commits", commit) }
 
 // refFile hashes the ref, so a ref with '/' or '..' stays one file name.
-func (c ruleSetCache) refFile(ref string) string { return filepath.Join(c.dir, "refs", sha256Hex(ref)) }
+func (c ruleSetCache) refFile(ref string) string {
+	return filepath.Join(c.dir, "refs", digest.SHA256Hex(ref))
+}
 
 func (c ruleSetCache) hasCheckout(commit string) bool {
 	info, err := os.Stat(c.commitDir(commit))

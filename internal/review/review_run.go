@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/popoffvg/reviewrules/internal/digest"
 	"github.com/popoffvg/reviewrules/internal/prompts"
 	"github.com/popoffvg/reviewrules/internal/rulecatalog"
 	"github.com/popoffvg/reviewrules/internal/ruleset"
@@ -139,7 +140,7 @@ func RunReview(
 	}
 	review := hypothesisReview{config: cfg, diff: diff, ignorePatterns: catalog.IgnorePatterns}
 	if cfg.CorrectnessEnabled {
-		review.contextDigest = hypothesisDigest(text.ReviewSystem + "\x00" + text.ParentSession(parent))
+		review.contextDigest = digest.SHA256Hex(text.ReviewSystem + "\x00" + text.ParentSession(parent))
 	}
 	parent.ChangedFiles = diff.ChangedFiles
 	parent.Patch = diff.Patch
