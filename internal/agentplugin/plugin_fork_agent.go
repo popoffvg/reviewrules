@@ -2,6 +2,7 @@ package agentplugin
 
 import (
 	"context"
+	"slices"
 
 	"charm.land/fantasy"
 
@@ -67,28 +68,9 @@ func (a *PluginForkAgent) fork(
 ) (review.ForkReply, error) {
 	request := a.pluginRequest(prompt, settings)
 	request.SessionID = a.parentSessionID
-	request.Hypotheses = hypothesisLedger(hypotheses)
+	request.Hypotheses = slices.Clone(hypotheses)
 	reply, err := a.plugin.RunOperation(ctx, OperationFork, request)
 	return reply.forkReply(), err
-}
-
-func hypothesisLedger(hypotheses []review.Hypothesis) []HypothesisLedgerItem {
-	if len(hypotheses) == 0 {
-		return nil
-	}
-	rows := make([]HypothesisLedgerItem, len(hypotheses))
-	for index, hypothesis := range hypotheses {
-		rows[index] = HypothesisLedgerItem{
-			ID:       hypothesis.ID,
-			Slug:     hypothesis.Slug,
-			Commit:   hypothesis.Commit,
-			Hunt:     hypothesis.Hunt,
-			At:       hypothesis.At,
-			Question: hypothesis.Question,
-			Look:     hypothesis.Look,
-		}
-	}
-	return rows
 }
 
 // AppendToFork runs append with the fork id.

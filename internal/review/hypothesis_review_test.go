@@ -66,7 +66,7 @@ func TestReviewHypothesesAcrossBranchRuns(t *testing.T) {
 	}
 
 	writeHypothesisFile(t, repo, "second.txt", "second-branch-change\n")
-	next := runHypothesisReview(t, cfg, `{"hypotheses":[{"slug":"first-defect","at":"first.txt:1","question":"Can the first change fail?","look":"updated caller"},{"slug":"first-defect","at":"second.txt:1","question":"Can the first change fail?"}]}`)
+	next := runHypothesisReview(t, cfg, `{"hypotheses":[{"slug":"first-defect","at":"first.txt:1","question":"Can the first change fail?","hunt":"Callers","look":"updated caller"},{"slug":"first-defect","at":"second.txt:1","question":"Can the first change fail?"}]}`)
 	if len(next.agent.generators) != 1 || len(next.agent.checks) != 1 || len(next.report.Correctness.HypothesisCheck) != 2 {
 		t.Fatalf("next review launched %d generators and %d checks", len(next.agent.generators), len(next.agent.checks))
 	}
@@ -83,7 +83,7 @@ func TestReviewHypothesesAcrossBranchRuns(t *testing.T) {
 	if checks[0].Commit != firstCommit || checks[1].Commit != next.report.Commit || checks[0].ID == checks[1].ID || checks[0].Slug == checks[1].Slug {
 		t.Errorf("hypothesis identities do not match their source commits: %+v", checks)
 	}
-	if checks[0].Look != "updated caller" {
+	if checks[0].Hunt != "Callers" || checks[0].Look != "updated caller" {
 		t.Error("repeated hypothesis did not retain the new caller context")
 	}
 
@@ -100,8 +100,8 @@ func TestReviewHypothesesAcrossBranchRuns(t *testing.T) {
 		t.Fatal(err)
 	}
 	dirty := runHypothesisReview(t, cfg, `{"hypotheses":[]}`)
-	if len(dirty.agent.generators) != 1 || !strings.Contains(dirty.agent.generators[0], "+dirty-change") || len(dirty.report.Correctness.HypothesisCheck) != 2 {
-		t.Fatal("worktree change did not use the delta from the committed snapshot")
+	if len(dirty.agent.generators) != 1 || strings.Contains(dirty.agent.generators[0], "affected by the delta below") || len(dirty.report.Correctness.HypothesisCheck) != 2 {
+		t.Fatal("changed worktree must use the full captured diff")
 	}
 	dirtyAgain := runHypothesisReview(t, cfg, "")
 	if len(dirtyAgain.agent.generators) != 0 || len(dirtyAgain.report.Correctness.HypothesisCheck) != 2 {

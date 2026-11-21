@@ -4,7 +4,11 @@
 // The built-in codex and claude plugins implement AgentPlugin in-process.
 package agentplugin
 
-import "context"
+import (
+	"context"
+
+	"github.com/popoffvg/reviewrules/internal/hypothesis"
+)
 
 // PluginProtocolVersion is the protocol_version of every request. A plugin MUST reject a version it does not know.
 const PluginProtocolVersion = 1
@@ -38,18 +42,7 @@ type PluginRequest struct {
 	SessionID string `json:"session_id,omitempty"`
 	// Hypotheses is the batch for a checker fork. Rule forks, the generator, start-parent,
 	// and append leave it empty.
-	Hypotheses []HypothesisLedgerItem `json:"hypotheses,omitempty"`
-}
-
-// HypothesisLedgerItem is one row of the checker fork's hypotheses field.
-type HypothesisLedgerItem struct {
-	ID       string `json:"id"`
-	Slug     string `json:"slug,omitempty"`
-	Commit   string `json:"commit,omitempty"`
-	Hunt     string `json:"hunt"`
-	At       string `json:"at"`
-	Question string `json:"question"`
-	Look     string `json:"look"`
+	Hypotheses []hypothesis.ReviewHypothesis `json:"hypotheses,omitempty"`
 }
 
 // PluginReply is the JSON on the plugin's stdout. SessionID names the session this run wrote to:

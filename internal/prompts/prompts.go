@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"github.com/popoffvg/reviewrules/internal/hypothesis"
 )
 
 //go:embed *.md *.md.tmpl
@@ -70,6 +72,7 @@ type HypothesisGeneratorInput struct {
 	Delta         string
 	Previous      string
 	Example       string
+	AllowEmpty    bool
 }
 
 // HypothesisCheckInput is the ledger one checker fork answers.
@@ -79,13 +82,7 @@ type HypothesisCheckInput struct {
 
 // HypothesisCheckItem is one row of the checker prompt, the same row as the protocol hypotheses field.
 type HypothesisCheckItem struct {
-	ID       string
-	Slug     string
-	Commit   string
-	Hunt     string
-	At       string
-	Question string
-	Look     string
+	hypothesis.ReviewHypothesis
 	// Undecided is why the ledger fork left the row UNSURE; it is empty in the ledger itself.
 	Undecided string
 }

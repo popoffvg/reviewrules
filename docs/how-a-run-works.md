@@ -19,7 +19,7 @@ See [review results](review-results.md) for verdicts, failure policy, usage, and
 
 The cache scopes questions to a Git repository, branch, and review base. Each question has a stable slug and the HEAD commit when the generator first wrote it. The report records the commit reviewed in the current run.
 
-Unchanged review inputs skip the generator. After a commit, the generator focuses on the changes since the last cached review. If the review inputs change and Git cannot supply a scoped delta, the generator uses the full diff.
+Unchanged review inputs skip the generator. After a commit, the generator focuses on the changes since the last cached review. If a worktree review changes, the generator uses the full diff already captured for that run.
 
 The disk cache removes the least recently used entries first when it needs space. Every run verifies the questions against the current diff.
 

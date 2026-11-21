@@ -23,6 +23,19 @@ func TestGenerateHypothesesRejectsAnEmptyList(t *testing.T) {
 	}
 }
 
+func TestGenerateHypothesesAllowsAnEmptyListForACachedReview(t *testing.T) {
+	got, _, err := GenerateHypothesesInFork(
+		t.Context(),
+		scriptForkAgent{text: `{"hypotheses": []}`},
+		ForkSettings{},
+		prompts.Default(),
+		prompts.HypothesisGeneratorInput{AllowEmpty: true},
+	)
+	if err != nil || len(got) != 0 {
+		t.Fatalf("expected an empty list when a prior review exists, got %v with error %v", got, err)
+	}
+}
+
 func TestCheckHypothesesReadsTheLedger(t *testing.T) {
 	ledger := []Hypothesis{
 		{ID: "H1", At: "a.go:1", Question: "Does the last second overflow?"},

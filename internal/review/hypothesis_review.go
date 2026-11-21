@@ -1,6 +1,7 @@
 package review
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"log/slog"
@@ -48,8 +49,9 @@ func (review hypothesisReview) hypotheses(
 	}
 
 	input := prompts.HypothesisGeneratorInput{
-		Delta:    review.delta(ctx, previous),
-		Previous: previousQuestions(previous.Hypotheses),
+		Delta:      review.delta(ctx, previous),
+		Previous:   previousQuestions(previous.Hypotheses),
+		AllowEmpty: previous.Head != "",
 	}
 	limit <- struct{}{}
 	generated, usage, err := GenerateHypothesesInFork(ctx, agent, settings, text, input)
@@ -88,10 +90,10 @@ func checkHypothesisBatches(
 }
 
 func (review hypothesisReview) delta(ctx context.Context, previous hypothesisSnapshot) string {
-	if previous.MergeBase != review.diff.MergeBase || previous.ContextDigest != review.contextDigest {
+	cfg := review.config
+	if cfg.IncludeWorktree || previous.MergeBase != review.diff.MergeBase || previous.ContextDigest != review.contextDigest {
 		return ""
 	}
-	cfg := review.config
 	pathspec := reviewPathspec(review.ignorePatterns)
 	if previous.Worktree {
 		committedPatch, err := loadReviewPatch(ctx, cfg.RepoRoot, []string{previous.MergeBase, previous.Head}, pathspec, cfg.MaxDiffBytes)
@@ -99,7 +101,7 @@ func (review hypothesisReview) delta(ctx context.Context, previous hypothesisSna
 			return ""
 		}
 	}
-	delta, err := loadReviewPatch(ctx, cfg.RepoRoot, reviewRevisions(previous.Head, review.diff.Head, cfg.IncludeWorktree), pathspec, cfg.MaxDiffBytes)
+	delta, err := loadReviewPatch(ctx, cfg.RepoRoot, []string{previous.Head, review.diff.Head}, pathspec, cfg.MaxDiffBytes)
 	if err != nil {
 		return ""
 	}
@@ -136,9 +138,8 @@ func mergeHypotheses(previous []Hypothesis, generated []Hypothesis, commit strin
 		question := questionKey(hypothesis)
 		slug := hypothesisSlug(hypothesis.Slug, hypothesis.Question)
 		if i, duplicate := questions[question]; duplicate {
-			if hypothesis.Look != "" {
-				merged[i].Look = hypothesis.Look
-			}
+			merged[i].Hunt = cmp.Or(hypothesis.Hunt, merged[i].Hunt)
+			merged[i].Look = cmp.Or(hypothesis.Look, merged[i].Look)
 			continue
 		}
 		base := slug

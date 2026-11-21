@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"charm.land/fantasy"
+	"github.com/popoffvg/reviewrules/internal/hypothesis"
 	"github.com/popoffvg/reviewrules/internal/prompts"
 )
 
@@ -25,16 +26,8 @@ const (
 	HypothesisVerdictUnsure    HypothesisVerdict = "UNSURE"
 )
 
-// Hypothesis is one yes/no question about the diff; YES means a defect at At.
-type Hypothesis struct {
-	ID       string `json:"id,omitempty"`
-	Slug     string `json:"slug,omitempty"`
-	Commit   string `json:"commit,omitempty"`
-	Hunt     string `json:"hunt"`
-	At       string `json:"at"`
-	Question string `json:"question"`
-	Look     string `json:"look"`
-}
+// Hypothesis uses the shared question schema in reviews.
+type Hypothesis = hypothesis.ReviewHypothesis
 
 // HypothesisCheck is the outcome of one checker fork.
 // An error leaves the verdict UNSURE: a failed check never counts as a defect.
@@ -96,7 +89,7 @@ func GenerateHypothesesInFork(
 		return nil, usage, fmt.Errorf("hypothesis generator reply: %w", err)
 	}
 	hypotheses := reply.Hypotheses
-	if len(hypotheses) == 0 && input.Delta == "" && input.Previous == "" {
+	if len(hypotheses) == 0 && !input.AllowEmpty {
 		return nil, usage, fmt.Errorf("hypothesis generator reply: hypotheses list is empty")
 	}
 	if len(hypotheses) > maxHypotheses {
@@ -131,21 +124,9 @@ func CheckHypothesesInFork(
 ) []HypothesisCheck {
 	items := make([]prompts.HypothesisCheckItem, len(hypotheses))
 	for index, hypothesis := range hypotheses {
-		items[index] = hypothesisCheckItem(hypothesis)
+		items[index] = prompts.HypothesisCheckItem{ReviewHypothesis: hypothesis}
 	}
 	return checkLedgerInFork(ctx, agent, settings, hypotheses, items, text)
-}
-
-func hypothesisCheckItem(hypothesis Hypothesis) prompts.HypothesisCheckItem {
-	return prompts.HypothesisCheckItem{
-		ID:       hypothesis.ID,
-		Slug:     hypothesis.Slug,
-		Commit:   hypothesis.Commit,
-		Hunt:     hypothesis.Hunt,
-		At:       hypothesis.At,
-		Question: hypothesis.Question,
-		Look:     hypothesis.Look,
-	}
 }
 
 func checkLedgerInFork(
@@ -209,8 +190,7 @@ func RecheckUndecidedHypothesis(
 	check HypothesisCheck,
 	text prompts.Set,
 ) HypothesisCheck {
-	item := hypothesisCheckItem(check.Hypothesis)
-	item.Undecided = check.UndecidedReason()
+	item := prompts.HypothesisCheckItem{ReviewHypothesis: check.Hypothesis, Undecided: check.UndecidedReason()}
 	recheck := checkLedgerInFork(ctx, agent, settings, []Hypothesis{check.Hypothesis}, []prompts.HypothesisCheckItem{item}, text)[0]
 	recheck.Usage = AddUsage(check.Usage, recheck.Usage)
 	return recheck
