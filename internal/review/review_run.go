@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 
 	"github.com/popoffvg/reviewrules/internal/prompts"
@@ -129,15 +130,20 @@ func RunReview(
 	if text.ReviewSystem == "" {
 		text = prompts.Default()
 	}
-	parentUsage, err := agent.StartParentSession(ctx, text.ParentSession(prompts.ParentSessionInput{
+	parent := prompts.ParentSessionInput{
 		Instructions:        catalog.Instructions,
 		RuleSetInstructions: ruleSetInstructions(catalog.RuleSetInstructions),
 		RunContext:          cfg.RunContext,
 		Docs:                docs,
 		Base:                diff.Base,
-		ChangedFiles:        diff.ChangedFiles,
-		Patch:               diff.Patch,
-	}), parentSettings)
+	}
+	review := hypothesisReview{config: cfg, diff: diff, ignorePatterns: catalog.IgnorePatterns}
+	if cfg.CorrectnessEnabled {
+		review.contextDigest = hypothesisDigest(text.ReviewSystem + "\x00" + text.ParentSession(parent))
+	}
+	parent.ChangedFiles = diff.ChangedFiles
+	parent.Patch = diff.Patch
+	parentUsage, err := agent.StartParentSession(ctx, text.ParentSession(parent), parentSettings)
 	if err != nil {
 		return report, err
 	}
@@ -161,7 +167,6 @@ func RunReview(
 	report.Correctness.Enabled = cfg.CorrectnessEnabled
 	if cfg.CorrectnessEnabled {
 		wait.Go(func() {
-			review := hypothesisReview{config: cfg, diff: diff, ignorePatterns: catalog.IgnorePatterns}
 			hypotheses, usage, err := review.hypotheses(ctx, logger, agent, limit, generatorSettings, text)
 			lock.Lock()
 			report.Correctness.GeneratorUsage = usage
@@ -171,9 +176,11 @@ func RunReview(
 			lock.Unlock()
 			var checks []HypothesisCheck
 			if len(hypotheses) > 0 {
-				limit <- struct{}{}
-				checks = CheckHypothesesInFork(ctx, agent, checkSettings, hypotheses, text)
-				<-limit
+				for batch := range slices.Chunk(hypotheses, maxHypotheses) {
+					limit <- struct{}{}
+					checks = append(checks, CheckHypothesesInFork(ctx, agent, checkSettings, batch, text)...)
+					<-limit
+				}
 				logger.Info("review hypothesis ledger done", "hypotheses", len(checks))
 				var recheck sync.WaitGroup
 				for index := range checks {

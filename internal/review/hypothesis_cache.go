@@ -27,11 +27,12 @@ type hypothesisCache struct {
 }
 
 type hypothesisSnapshot struct {
-	Head        string       `json:"head"`
-	MergeBase   string       `json:"merge_base"`
-	PatchDigest string       `json:"patch_digest"`
-	Worktree    bool         `json:"worktree"`
-	Hypotheses  []Hypothesis `json:"hypotheses"`
+	Head          string       `json:"head"`
+	MergeBase     string       `json:"merge_base"`
+	ContextDigest string       `json:"context_digest"`
+	PatchDigest   string       `json:"patch_digest"`
+	Worktree      bool         `json:"worktree"`
+	Hypotheses    []Hypothesis `json:"hypotheses"`
 }
 
 func branchHypothesisCache(ctx context.Context, cfg ReviewRunConfig, diff ReviewDiff, ignorePatterns []string, templateDigest string) (hypothesisCache, error) {
@@ -100,8 +101,11 @@ func (cache hypothesisCache) save(ctx context.Context, expected string, snapshot
 		return nil
 	}
 	data, err := json.Marshal(snapshot)
-	if err != nil || int64(len(data)) > cache.maxBytes {
+	if err != nil {
 		return err
+	}
+	if int64(len(data)) > cache.maxBytes {
+		return fmt.Errorf("hypothesis snapshot exceeds the cache budget: %d bytes", len(data))
 	}
 	root, closeCache, err := cache.open(ctx)
 	if err != nil {

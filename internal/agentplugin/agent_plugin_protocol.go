@@ -36,7 +36,7 @@ type PluginRequest struct {
 	// SessionID is empty for start-parent. For fork it is the session to copy: the parent or a fork.
 	// For append it is the session to add the turn to.
 	SessionID string `json:"session_id,omitempty"`
-	// Hypotheses is the ledger of the one checker fork. Rule forks, the generator, start-parent,
+	// Hypotheses is the batch for a checker fork. Rule forks, the generator, start-parent,
 	// and append leave it empty.
 	Hypotheses []HypothesisLedgerItem `json:"hypotheses,omitempty"`
 }

@@ -41,6 +41,6 @@ The report's `commit` identifies the current review. Each hypothesis has a `slug
 
 ## Correctness check
 
-The correctness check runs by default. One checker fork verifies the earlier and new questions against the current diff. Each question that stays `UNSURE` gets a separate check.
+The correctness check runs by default. Checker forks verify the earlier and new questions in batches against the current diff. Each question that stays `UNSURE` gets a separate check.
 
 Choose the generator and checker models separately with `hypothesis_model` and `hypothesis_check_model`. To turn correctness off, set `correctness = false` in `.reviewrules/settings.toml`. See [the hypothesis cache](how-a-run-works.md#hypothesis-cache) for when a run can skip generation.

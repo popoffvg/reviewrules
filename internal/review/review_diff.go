@@ -40,12 +40,12 @@ func LoadReviewDiff(
 
 	pathspec := reviewPathspec(ignorePatterns)
 	revisions := reviewRevisions(mergeBase, head, includeWorktree)
-	patch, err := loadReviewPatch(ctx, repoRoot, revisions, pathspec, maxBytes)
+	raw, err := runReviewDiff(ctx, repoRoot, revisions, pathspec, "--raw", "-z", "--patch")
 	if err != nil {
 		return ReviewDiff{}, err
 	}
-	namesArgs := append(append([]string{"diff", "--name-only"}, revisions...), pathspec...)
-	names, err := runGit(ctx, repoRoot, namesArgs...)
+	names, patch := splitReviewDiff(raw)
+	err = checkReviewPatchSize(patch, maxBytes)
 	if err != nil {
 		return ReviewDiff{}, err
 	}
@@ -54,7 +54,7 @@ func LoadReviewDiff(
 		MergeBase:    mergeBase,
 		Head:         head,
 		Patch:        patch,
-		ChangedFiles: strings.Fields(names),
+		ChangedFiles: names,
 	}, nil
 }
 
@@ -74,20 +74,46 @@ func reviewPathspec(ignorePatterns []string) []string {
 }
 
 func loadReviewPatch(ctx context.Context, repoRoot string, revisions []string, pathspec []string, maxBytes int) (string, error) {
-	args := append(append([]string{"diff", "--no-color", "--no-ext-diff"}, revisions...), pathspec...)
-	patch, err := runGit(ctx, repoRoot, args...)
+	patch, err := runReviewDiff(ctx, repoRoot, revisions, pathspec)
 	if err != nil {
 		return "", err
 	}
+	return patch, checkReviewPatchSize(patch, maxBytes)
+}
+
+func runReviewDiff(ctx context.Context, repoRoot string, revisions []string, pathspec []string, flags ...string) (string, error) {
+	args := append([]string{"diff", "--no-color", "--no-ext-diff"}, flags...)
+	args = append(args, revisions...)
+	return runGit(ctx, repoRoot, append(args, pathspec...)...)
+}
+
+func splitReviewDiff(raw string) ([]string, string) {
+	records, patch, found := strings.Cut(raw, "\x00\x00")
+	if !found {
+		return nil, raw
+	}
+	fields := strings.Split(records, "\x00")
+	var names []string
+	for i := 0; i+1 < len(fields); i += 2 {
+		status := fields[i][strings.LastIndexByte(fields[i], ' ')+1:]
+		if i+2 < len(fields) && (strings.HasPrefix(status, "R") || strings.HasPrefix(status, "C")) {
+			i++
+		}
+		names = append(names, fields[i+1])
+	}
+	return names, patch
+}
+
+func checkReviewPatchSize(patch string, maxBytes int) error {
 	if len(patch) > maxBytes {
-		return "", fmt.Errorf(
+		return fmt.Errorf(
 			"review diff is %d bytes, over the max_diff_bytes limit of %d; add generated paths to ignorePatterns",
 			len(patch),
 			maxBytes,
 		)
 	}
 
-	return patch, nil
+	return nil
 }
 
 func runGit(ctx context.Context, repoRoot string, args ...string) (string, error) {

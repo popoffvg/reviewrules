@@ -46,9 +46,17 @@ func TestReviewHypothesesAcrossBranchRuns(t *testing.T) {
 	if len(again.agent.generators) != 0 || len(again.agent.checks) != 1 || again.report.Correctness.GeneratorUsage.InputTokens != 0 {
 		t.Fatal("unchanged review must skip generation and run the old check")
 	}
+	err = os.WriteFile(filepath.Join(repo, ".reviewrules", "config.json"), []byte(`{"instructions":"Check empty values."}`), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newContext := runHypothesisReview(t, cfg, `{"hypotheses":[]}`)
+	if len(newContext.agent.generators) != 1 || len(newContext.agent.checks) != 1 {
+		t.Fatal("changed instructions must regenerate and run the old check")
+	}
 
 	writeHypothesisFile(t, repo, "second.txt", "second-branch-change\n")
-	next := runHypothesisReview(t, cfg, `{"hypotheses":[{"slug":"first-defect","question":"Does the first change fail?"},{"slug":"second-defect","at":"second.txt:1","question":"Can the second change fail?"}]}`)
+	next := runHypothesisReview(t, cfg, `{"hypotheses":[{"slug":"first-defect","question":"Can the first change fail?"},{"slug":"first-defect","at":"second.txt:1","question":"Can the second change fail?"}]}`)
 	if len(next.agent.generators) != 1 || len(next.agent.checks) != 1 || len(next.report.Correctness.HypothesisCheck) != 2 {
 		t.Fatalf("next review launched %d generators and %d checks", len(next.agent.generators), len(next.agent.checks))
 	}
@@ -62,7 +70,7 @@ func TestReviewHypothesesAcrossBranchRuns(t *testing.T) {
 		t.Error("delta prompt contains the earlier commit's patch")
 	}
 	checks := next.report.Correctness.HypothesisCheck
-	if checks[0].Commit != firstCommit || checks[1].Commit != next.report.Commit || checks[0].ID == checks[1].ID {
+	if checks[0].Commit != firstCommit || checks[1].Commit != next.report.Commit || checks[0].ID == checks[1].ID || checks[0].Slug == checks[1].Slug {
 		t.Errorf("hypothesis identities do not match their source commits: %+v", checks)
 	}
 
@@ -103,6 +111,21 @@ func TestReviewHypothesesAcrossBranchRuns(t *testing.T) {
 	detached := runHypothesisReview(t, cfg, coldReply)
 	if len(detached.agent.generators) != 1 || len(detached.report.Correctness.HypothesisCheck) != 1 {
 		t.Fatal("detached review used the branch's cached questions")
+	}
+
+	runHypothesisGit(t, repo, "switch", firstBranch)
+	writeHypothesisFile(t, repo, "third.txt", "third-branch-change\n")
+	newQuestions := make([]Hypothesis, maxHypotheses)
+	for i := range newQuestions {
+		newQuestions[i].Question = fmt.Sprintf("Can input %d cause the third change to fail?", i)
+	}
+	reply, err := json.Marshal(hypothesisListReply{Hypotheses: newQuestions})
+	if err != nil {
+		t.Fatal(err)
+	}
+	batched := runHypothesisReview(t, cfg, string(reply))
+	if len(batched.agent.checks) != 2 || len(batched.report.Correctness.HypothesisCheck) != maxHypotheses+2 {
+		t.Fatal("checker must verify the full ledger in batches")
 	}
 }
 

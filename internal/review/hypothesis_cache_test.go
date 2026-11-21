@@ -42,7 +42,10 @@ func TestHypothesisCacheEvictsBySizeAndUse(t *testing.T) {
 
 	oversize := snapshot
 	oversize.Hypotheses = []Hypothesis{{Question: strings.Repeat("x", len(data)*2)}}
-	saveHypothesisSnapshot(t, caches[3], "", oversize)
+	err = caches[3].save(t.Context(), "", oversize)
+	if err == nil {
+		t.Fatal("oversized snapshot did not report an error")
+	}
 	if _, stamp := readHypothesisSnapshot(t, caches[3]); stamp != "" {
 		t.Fatal("oversized snapshot entered the cache")
 	}

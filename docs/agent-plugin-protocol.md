@@ -74,7 +74,7 @@ One review is one run of reviewrules. It calls the plugin in this order:
 1. **`start-parent`, one time.** The prompt has the review instructions, the scoped docs, and the diff. reviewrules waits until this call ends before it starts any fork, so that every fork finds the parent history in the prompt cache of the backend. reviewrules keeps the `session_id` of the reply as the parent session.
 2. **`fork` for each rule check, in parallel.** Each rule check is a fork of the parent session. The fork prompt has the text of one rule.
 3. **`fork` for the hypothesis generator, in parallel with the rule forks.** The [hypothesis cache](how-a-run-works.md#hypothesis-cache) lets an unchanged review skip this fork. Set `correctness = false` in `.reviewrules/settings.toml` to skip correctness checks.
-4. **`fork` once for the hypothesis ledger.** After generation, if needed, reviewrules forks the current parent session once. The request and prompt include the earlier and new hypotheses.
+4. **`fork` for each batch of hypotheses.** After generation, if needed, reviewrules forks the current parent session for each batch. The request and prompt include that batch's earlier and new hypotheses.
 5. **`append`, only when a fork reply has no JSON block.** Each fork MUST end with a JSON block. When the `text` of a fork reply has no usable JSON block, reviewrules sends one `append` to that fork. The prompt asks the model again for only the JSON block, and `max_steps` is `1`. reviewrules sends at most one `append` per fork.
 
 At most `parallel` operations (user config key `parallel`, default 8) run at the same time. Thus the plugin can run up to `parallel` processes at the same time, on the same parent session.

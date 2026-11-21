@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 
 	"charm.land/fantasy"
@@ -14,6 +15,7 @@ type hypothesisReview struct {
 	config         ReviewRunConfig
 	diff           ReviewDiff
 	ignorePatterns []string
+	contextDigest  string
 }
 
 func (review hypothesisReview) hypotheses(
@@ -34,7 +36,7 @@ func (review hypothesisReview) hypotheses(
 		logger.Warn("hypothesis cache read failed", "error", err)
 	}
 	digest := hypothesisDigest(review.diff.Patch)
-	if previous.MergeBase == review.diff.MergeBase && previous.PatchDigest == digest {
+	if previous.MergeBase == review.diff.MergeBase && previous.ContextDigest == review.contextDigest && previous.PatchDigest == digest {
 		logger.Info("hypothesis cache reused unchanged diff", "hypotheses", len(previous.Hypotheses))
 		return previous.Hypotheses, fantasy.Usage{}, nil
 	}
@@ -53,7 +55,7 @@ func (review hypothesisReview) hypotheses(
 	hypotheses := mergeHypotheses(previous.Hypotheses, generated, review.diff.Head)
 	err = cache.save(ctx, stamp, hypothesisSnapshot{
 		Head: review.diff.Head, MergeBase: review.diff.MergeBase, PatchDigest: digest,
-		Worktree: review.config.IncludeWorktree, Hypotheses: hypotheses,
+		ContextDigest: review.contextDigest, Worktree: review.config.IncludeWorktree, Hypotheses: hypotheses,
 	})
 	if err != nil {
 		logger.Warn("hypothesis cache write failed", "error", err)
@@ -62,7 +64,7 @@ func (review hypothesisReview) hypotheses(
 }
 
 func (review hypothesisReview) delta(ctx context.Context, previous hypothesisSnapshot) string {
-	if previous.MergeBase != review.diff.MergeBase {
+	if previous.MergeBase != review.diff.MergeBase || previous.ContextDigest != review.contextDigest {
 		return ""
 	}
 	cfg := review.config
@@ -81,9 +83,15 @@ func (review hypothesisReview) delta(ctx context.Context, previous hypothesisSna
 }
 
 func previousQuestions(hypotheses []Hypothesis) string {
+	const contextBytes = 32 << 10
 	var questions strings.Builder
-	for _, hypothesis := range hypotheses {
-		fmt.Fprintf(&questions, "- %s: %s\n", hypothesis.Slug, hypothesis.Question)
+	for i := len(hypotheses) - 1; i >= 0; i-- {
+		hypothesis := hypotheses[i]
+		item := fmt.Sprintf("- %s: %s\n", hypothesis.Slug, hypothesis.Question)
+		if questions.Len()+len(item) > contextBytes {
+			break
+		}
+		questions.WriteString(item)
 	}
 	return strings.TrimSuffix(questions.String(), "\n")
 }
@@ -102,8 +110,12 @@ func mergeHypotheses(previous []Hypothesis, generated []Hypothesis, commit strin
 	for _, hypothesis := range generated {
 		question := questionKey(hypothesis.Question)
 		slug := hypothesisSlug(hypothesis.Slug, question)
-		if slugs[slug] || questions[question] {
+		if questions[question] {
 			continue
+		}
+		base := slug
+		for suffix := 2; slugs[slug]; suffix++ {
+			slug = base + "-" + strconv.Itoa(suffix)
 		}
 		hypothesis.ID = fmt.Sprintf("H%d", len(merged)+1)
 		hypothesis.Slug = slug
