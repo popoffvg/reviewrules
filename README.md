@@ -75,7 +75,7 @@ codex plugin marketplace add popoffvg/reviewrules
 codex plugin add reviewrules@reviewrules
 ```
 
-The plugin includes skills to run a review, create an agent plugin, and identify rules a linter can handle. See [plugin setup](docs/coding-agents.md).
+The plugin includes skills to run a review, create an agent plugin, and identify rules a linter can handle. See [plugin setup](https://popoffvg.github.io/reviewrules/docs/coding-agents.html).
 
 ## Run a review
 
