@@ -20,16 +20,21 @@ validation:
 
 nav:
   - Home: https://popoffvg.github.io/reviewrules/
-  - Quick start: index.md
-  - Guides:
-      - Choose a backend: backends.md
+  - Start here:
+      - Getting started: index.md
+      - Install reviewrules: installation.md
+      - Run from a coding agent: coding-agents.md
+      - Run in CI: ci.md
+  - Review rules:
       - Write rules: writing-rules.md
       - Share rule sets: rule-sets.md
-      - Run in CI: ci.md
-      - Read a review result: review-results.md
+  - Backends:
+      - Choose a backend: backends.md
+      - Set up LiteLLM: litellm.md
+      - Add an agent plugin: agent-plugins.md
   - Reference:
+      - CLI commands: cli.md
       - Configuration: configuration.md
+      - Review results: review-results.md
       - How a review works: how-a-run-works.md
-      - LiteLLM: litellm.md
-      - Agent plugins: agent-plugins.md
       - Agent plugin protocol: agent-plugin-protocol.md

@@ -75,7 +75,7 @@ codex plugin marketplace add popoffvg/reviewrules
 codex plugin add reviewrules@reviewrules
 ```
 
-The plugin includes skills to run a review, create an agent plugin, and identify rules a linter can handle. See [plugin setup](docs/backends.md#run-from-claude-code-or-codex).
+The plugin includes skills to run a review, create an agent plugin, and identify rules a linter can handle. See [plugin setup](docs/coding-agents.md).
 
 ## Run a review
 
@@ -118,6 +118,8 @@ Every other setting lives in a config file. This table is generated from the CLI
 <!-- flags:end -->
 
 ## Guides
+
+Start with the [documentation site](https://popoffvg.github.io/reviewrules/docs/).
 
 | I want to… | Guide |
 |---|---|
