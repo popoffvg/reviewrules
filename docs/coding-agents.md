@@ -1,6 +1,6 @@
 # Run from a coding agent
 
-Install the reviewrules plugin to start a review from a Claude Code or Codex session. Set up the [review backend](backends.md) before your first run.
+Install the reviewrules plugin to start a review from Claude Code or Codex. Set up a [review backend](backends.md) before your first run.
 
 ## Claude Code
 
@@ -16,7 +16,9 @@ codex plugin marketplace add popoffvg/reviewrules
 codex plugin add reviewrules@reviewrules
 ```
 
-To install from a local clone, replace `popoffvg/reviewrules` with the path to the clone. Open a session in the repository you want to review and ask the agent to review your branch with reviewrules.
+To install from a local clone, use the path to the clone in place of `popoffvg/reviewrules`.
+
+Open a session in the repository you want to review. Ask the agent to “review my branch with reviewrules.”
 
 ## Included skills
 

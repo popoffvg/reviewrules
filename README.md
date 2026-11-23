@@ -123,6 +123,8 @@ Start with the [documentation site](https://popoffvg.github.io/reviewrules/docs/
 
 | I want to… | Guide |
 |---|---|
+| Install reviewrules | [Installation](docs/installation.md) |
+| Find a command or flag | [CLI commands](docs/cli.md) |
 | Write, scope, or organize rules | [Writing rules](docs/writing-rules.md) |
 | Share rules across repositories | [Rule sets](docs/rule-sets.md) |
 | Choose a backend or model | [Backend setup](docs/backends.md) |
@@ -132,6 +134,7 @@ Start with the [documentation site](https://popoffvg.github.io/reviewrules/docs/
 | Understand the forks and shared context | [How a run works](docs/how-a-run-works.md) |
 | Use a ChatGPT plan through LiteLLM | [Local proxy](docs/litellm.md) · [Shared CI proxy](deploy/litellm/README.md) |
 | Add an agent backend | [Agent plugins](docs/agent-plugins.md) · [Protocol](docs/agent-plugin-protocol.md) |
+| Fix a setup or review problem | [Troubleshooting](docs/troubleshooting.md) |
 | Develop or contribute | [Contributing](CONTRIBUTING.md) |
 
 ## License

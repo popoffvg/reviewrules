@@ -1,6 +1,6 @@
 # Getting started
 
-reviewrules checks a Git diff against rules you write in plain language. Each rule in scope gets its own verdict. You can run the same rules locally and in CI.
+reviewrules checks a Git diff against rules you write in plain language. Each rule in scope gets its own verdict. Use the same rules locally and in CI.
 
 ## Install
 
@@ -8,7 +8,7 @@ reviewrules checks a Git diff against rules you write in plain language. Each ru
 
 ## Configure
 
-Add the following to `~/.config/reviewrules/config.toml`. Use the existing `[local]` section if the file already has one. To use Claude Code or an API, see [backend setup](backends.md).
+Add these settings to `~/.config/reviewrules/config.toml`. If the file already has a `[local]` section, add `agent` to that section. For Claude Code or a direct API, see [backend setup](backends.md).
 
 ```toml
 [local]
@@ -17,7 +17,7 @@ agent = "codex"
 
 ## Add a rule
 
-In the repository you want to review, create `.reviewrules/config.json`. This example checks Go files for error messages that omit the failed operation.
+Create `.reviewrules/config.json` at the root of your repository. This rule checks that new error messages in Go files name the operation that failed.
 
 ```json
 {
@@ -40,13 +40,14 @@ Run this command from the repository root.
 reviewrules --base origin/main --worktree
 ```
 
-Replace `origin/main` with your base branch. `--worktree` includes staged and unstaged edits to tracked files. Stage any new files you want to review.
+Replace `origin/main` with your base branch. Stage new files with `git add` to include them in the review.
 
-Read the verdict for `error-context` in the terminal. A violation includes a message and a file location when one is available. If the diff contains no Go files, the rule does not run. See [review results](review-results.md) for verdicts and exit codes.
+Find `error-context` in the summary. A `FAIL` lists the findings and any file locations the reviewer provides. The rule runs when the diff changes a Go file. See [review results](review-results.md).
 
-## Where to go next
+## Next steps
 
-- [Write rules](writing-rules.md) for conventions that need code context.
-- [Share a rule set](rule-sets.md) across team repositories.
-- [Run from a coding agent](coding-agents.md) in Claude Code or Codex.
-- [Run in CI](ci.md) on each pull request.
+- [Run from a coding agent](coding-agents.md) to start a review in Claude Code or Codex.
+- [Run in CI](ci.md) to check pull requests.
+- [Write rules](writing-rules.md) for your team’s conventions.
+- [Share rule sets](rule-sets.md) across repositories.
+- [Reviewrules website](https://popoffvg.github.io/reviewrules/).
