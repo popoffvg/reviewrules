@@ -43,8 +43,7 @@ invalid_link_anchors = true
 variant = "modern"
 font = false
 features = [
-  "navigation.tabs",
-  "navigation.tabs.sticky",
+  "navigation.sections",
   "navigation.expand",
   "navigation.footer",
   "toc.follow",
