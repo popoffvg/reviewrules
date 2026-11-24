@@ -46,4 +46,4 @@ fail_on = "medium"
 fail_on_unanswered = true
 ```
 
-`fail_on_unanswered` makes missing rule answers at or above `fail_on`, and hypothesis generator errors, fail the run. Without it, those errors are warnings. A confirmed correctness hypothesis always fails the review. See [review results](review-results.md) for all exit codes.
+`fail_on_unanswered` makes missing rule answers at or above `fail_on`, and hypothesis generator errors, fail the run. Without it, those errors are warnings. A confirmed bug fails the review at or above `fail_on_bug_priority`, which defaults to `high`. See [review results](review-results.md) for all exit codes.

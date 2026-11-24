@@ -8,14 +8,14 @@ The terminal summary lists each rule check with its severity and rule ID:
 | `FAIL` | The check reports findings, each with `file:line` and a message. |
 | `WARN` | The model gave no usable answer. The JSON rule verdict is `ERROR`. |
 
-Correctness hypotheses get `CONFIRMED`, `REFUTED`, or `UNSURE`. A confirmed hypothesis includes the input that breaks the code, evidence lines, and a proposed fix. An `UNSURE` hypothesis gets a second check in its own fork. A hypothesis that is still `UNSURE` after that check fails the review, and its `missing:` line names what the checker could not decide. Treat findings as review evidence to inspect.
+Correctness hypotheses get `CONFIRMED`, `REFUTED`, or `UNSURE`. A confirmed hypothesis has a `bug_priority` of `low`, `high`, or `critical`. A short, safe retry with no lasting harm has low priority. A missing or invalid priority defaults to high. A confirmed hypothesis includes the input that breaks the code, evidence lines, and a proposed fix. An `UNSURE` hypothesis gets a second check in its own fork. A hypothesis that is still `UNSURE` after that check fails the review, and its `missing:` line names what the checker could not decide. Treat findings as review evidence to inspect.
 
 ## Exit codes
 
 | Code | Meaning |
 |---|---|
 | `0` | The review passed its configured policy. |
-| `1` | A rule failed at or above `fail_on`, a correctness hypothesis was confirmed or stayed undecided, or `fail_on_unanswered` made an unanswered check fail. |
+| `1` | A rule failed at or above `fail_on`, a confirmed bug met `fail_on_bug_priority`, a hypothesis stayed undecided, or `fail_on_unanswered` made an unanswered check fail. |
 | `2` | The tool could not run, for example because of invalid config, a missing backend, or an oversized diff. |
 
 `fail_on` defaults to `medium`. An unanswered rule or hypothesis generator error is a warning by default. With `fail_on_unanswered = true`, unanswered rules at or above `fail_on` and generator errors fail the review. The final `Review failed because:` section names the reasons. After the reasons, the summary tells the reader to answer a finding that is by design or wrong with `--context "<file:line>: <why>"` on the next run. The parent prompt quotes each note under "Author context for this run", and the reviewer checks it against the code: a note does not turn a defect into a pass.

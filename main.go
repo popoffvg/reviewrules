@@ -184,7 +184,7 @@ func runReviewRules() int {
 		}
 	}
 	printReviewSummary(summaryOut, report)
-	reasons := report.ReviewFailureReasons(failOn, config.Repo.FailOnUnanswered)
+	reasons := report.ReviewFailureReasons(failOn, config.Repo.FailOnBugPriority, config.Repo.FailOnUnanswered)
 	if len(reasons) > 0 {
 		_, _ = fmt.Fprintln(summaryOut, "\nReview failed because:")
 		for _, reason := range reasons {
@@ -390,6 +390,7 @@ func printReviewSummary(target *os.File, report review.ReviewReport) {
 	for _, check := range report.Correctness.HypothesisCheck {
 		fmt.Fprintf(&out, "%-9s %s %s — %s\n", check.Verdict, check.ID, check.At, check.Question)
 		if check.Verdict == review.HypothesisVerdictConfirmed {
+			fmt.Fprintf(&out, "          priority: %s\n", check.BugPriority)
 			fmt.Fprintf(&out, "          input that breaks it: %s\n", check.Scenario)
 			for _, evidence := range check.Evidence {
 				fmt.Fprintf(&out, "          evidence: %s\n", evidence)

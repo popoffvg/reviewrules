@@ -36,7 +36,7 @@ reviewrules checks a git diff against the rules in `.reviewrules/` at the repo r
 ## Summary lines
 
 - `PASS`, `FAIL`, or `WARN` per rule check, with the severity and the rule id. Under a `FAIL`, each finding is `file:line — message`. `WARN` means the model gave no answer; it fails the run only with `fail_on_unanswered = true` in the repo settings.
-- `CONFIRMED`, `REFUTED`, or `UNSURE` per correctness hypothesis. A `CONFIRMED` line shows the input that breaks the code, the evidence, and the fix. A `CONFIRMED` hypothesis fails the run. An `UNSURE` line is a hypothesis that its recheck fork could not decide; it fails the run, and its `missing:` line names the gap. Decide it yourself from the code: read the line at `at` and every caller up to the entry point.
+- `CONFIRMED`, `REFUTED`, or `UNSURE` per correctness hypothesis. A `CONFIRMED` line shows the input that breaks the code, the evidence, and the fix. A `CONFIRMED` hypothesis fails the run at or above `fail_on_bug_priority`. An `UNSURE` line is a hypothesis that its recheck fork could not decide; it fails the run, and its `missing:` line names the gap. Decide it yourself from the code: read the line at `at` and every caller up to the entry point.
 - `usage:` for the total, then one `usage:` line per part (`parent`, `rules`, `correctness`) and model with its cost, then `cost estimate: total`. A model with no price asks for a `prices."<model>"` table in the user config.
 
 A `FAIL` below `fail_on` (default `medium`) does not fail the run. Report it, but do not block on it.

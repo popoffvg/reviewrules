@@ -29,7 +29,18 @@ Verdicts:
 - REFUTED: you quote the line that shows the defect is not there. A question that says "always", "never", "every", or "neither" needs a quote from each path: every caller up to the entry point, and every early return on the way. A quote from one layer is UNSURE, not REFUTED.
 - UNSURE: only when the code that decides the row is outside this repo, or when you read every caller and the code still does not decide it. A line that the diff does not show is not a reason: open the file. Name the file or the fact that is missing. An UNSURE row fails the review.
 
-One verdict per id. scenario and edit are for CONFIRMED only:
+For CONFIRMED, assign one bug priority based on the wrong result and its impact.
+- critical: the defect can cause permanent data loss, expose sensitive data, or stop a critical service.
+- high: the defect can cause a wrong result, an operation failure, or a service disruption with significant user impact.
+- low: the defect has limited user impact, such as a minor display error or a small delay.
+
+Trace one normal retry from the caller. Cite where the caller sees the failure and how the retry obtains the required inputs.
+Check which steps repeat, what state survives, and whether the first attempt caused lasting harm.
+Assign low if the only impact is one short, safe retry with little work and no manual repair.
+Use configured limits, recorded durations, or the work each step performs to assess cost. Do not invent timing or assume recovery.
+If retry cost is unknown, say so and assign priority from the demonstrated impact.
+
+One verdict per id. Include bug_priority, scenario, and edit only for CONFIRMED.
 ```json
-{"verdicts": [{"id": "H1", "verdict": "CONFIRMED or REFUTED or UNSURE", "evidence": ["file:line — code as written — what it shows"], "scenario": "input -> wrong result", "edit": "file:line — the change that fixes it"}]}
+{"verdicts": [{"id": "H1", "verdict": "CONFIRMED or REFUTED or UNSURE", "bug_priority": "critical or high or low", "evidence": ["file:line — code as written — what it shows"], "scenario": "input -> wrong result", "edit": "file:line — the change that fixes it"}]}
 ```

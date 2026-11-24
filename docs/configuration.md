@@ -18,6 +18,7 @@ The command line flags are in the Flags table in `README.md`. Every other choice
 |---|---|---|---|
 | `rule_folders` | `.reviewrules/settings.toml` | `[]` | more rule folder names, searched like .reviewrules in every directory; .reviewrules wins, then list order |
 | `fail_on` | `.reviewrules/settings.toml` | `"medium"` | lowest rule severity whose FAIL fails the run: low, medium, high |
+| `fail_on_bug_priority` | `.reviewrules/settings.toml` | `"high"` | lowest confirmed bug priority that fails the run: low, high, critical |
 | `fail_on_unanswered` | `.reviewrules/settings.toml` | `false` | fail the run when a rule at or above fail_on, or the hypothesis generator, gives no answer |
 | `correctness` | `.reviewrules/settings.toml` | `true` | run the hypothesis generator and one checker fork per hypothesis |
 | `max_diff_bytes` | `.reviewrules/settings.toml` | `300000` | refuse a diff larger than this |

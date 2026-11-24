@@ -33,12 +33,13 @@ type Hypothesis = hypothesis.ReviewHypothesis
 // An error leaves the verdict UNSURE: a failed check never counts as a defect.
 type HypothesisCheck struct {
 	Hypothesis
-	Verdict  HypothesisVerdict `json:"verdict"`
-	Evidence []string          `json:"evidence"`
-	Scenario string            `json:"scenario,omitempty"`
-	Edit     string            `json:"edit,omitempty"`
-	Error    string            `json:"error,omitempty"`
-	Usage    fantasy.Usage     `json:"usage"`
+	Verdict     HypothesisVerdict `json:"verdict"`
+	BugPriority BugPriority       `json:"bug_priority,omitempty"`
+	Evidence    []string          `json:"evidence"`
+	Scenario    string            `json:"scenario,omitempty"`
+	Edit        string            `json:"edit,omitempty"`
+	Error       string            `json:"error,omitempty"`
+	Usage       fantasy.Usage     `json:"usage"`
 }
 
 type hypothesisListReply struct {
@@ -63,10 +64,11 @@ func hypothesisGeneratorPrompt(text prompts.Set, input prompts.HypothesisGenerat
 }
 
 type hypothesisCheckReply struct {
-	Verdict  HypothesisVerdict `json:"verdict"`
-	Evidence []string          `json:"evidence"`
-	Scenario string            `json:"scenario"`
-	Edit     string            `json:"edit"`
+	Verdict     HypothesisVerdict `json:"verdict"`
+	BugPriority BugPriority       `json:"bug_priority,omitempty"`
+	Evidence    []string          `json:"evidence"`
+	Scenario    string            `json:"scenario"`
+	Edit        string            `json:"edit"`
 }
 
 // GenerateHypothesesInFork forks the parent session to write at most maxHypotheses questions.
@@ -89,8 +91,8 @@ func GenerateHypothesesInFork(
 		return nil, usage, fmt.Errorf("hypothesis generator reply: %w", err)
 	}
 	hypotheses := reply.Hypotheses
-	if len(hypotheses) == 0 && !input.AllowEmpty {
-		return nil, usage, fmt.Errorf("hypothesis generator reply: hypotheses list is empty")
+	if hypotheses == nil {
+		return nil, usage, fmt.Errorf("hypothesis generator reply: expected a hypotheses array")
 	}
 	if len(hypotheses) > maxHypotheses {
 		hypotheses = hypotheses[:maxHypotheses]
@@ -225,6 +227,7 @@ func applyHypothesisVerdict(check *HypothesisCheck, reply hypothesisCheckReply) 
 		check.Error = "CONFIRMED without a scenario; downgraded to UNSURE"
 	}
 	if check.Verdict == HypothesisVerdictConfirmed {
+		check.BugPriority = reply.BugPriority.orHigh()
 		check.Scenario = reply.Scenario
 		check.Edit = reply.Edit
 	}

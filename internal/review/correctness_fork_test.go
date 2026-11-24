@@ -10,16 +10,16 @@ import (
 	"github.com/popoffvg/reviewrules/internal/prompts"
 )
 
-func TestGenerateHypothesesRejectsAnEmptyList(t *testing.T) {
+func TestGenerateHypothesesRejectsNullHypotheses(t *testing.T) {
 	_, _, err := GenerateHypothesesInFork(
 		t.Context(),
-		scriptForkAgent{text: `{"hypotheses": []}`},
+		scriptForkAgent{text: `{"hypotheses": null}`},
 		ForkSettings{},
 		prompts.Default(),
 		prompts.HypothesisGeneratorInput{},
 	)
-	if err == nil || !strings.Contains(err.Error(), "hypotheses list is empty") {
-		t.Fatalf("error = %v; want hypotheses list is empty", err)
+	if err == nil || !strings.Contains(err.Error(), "expected a hypotheses array") {
+		t.Fatalf("error = %v; want expected a hypotheses array", err)
 	}
 }
 
@@ -29,10 +29,10 @@ func TestGenerateHypothesesAcceptsAnAllowedEmptyList(t *testing.T) {
 		scriptForkAgent{text: `{"hypotheses": []}`},
 		ForkSettings{},
 		prompts.Default(),
-		prompts.HypothesisGeneratorInput{AllowEmpty: true},
+		prompts.HypothesisGeneratorInput{},
 	)
 	if err != nil || len(got) != 0 {
-		t.Fatalf("expected an empty list when a prior review exists, got %v with error %v", got, err)
+		t.Fatalf("expected an empty list on the first review, got %v with error %v", got, err)
 	}
 }
 
@@ -43,7 +43,7 @@ func TestCheckHypothesesReadsTheLedger(t *testing.T) {
 	}
 	reply := `{"verdicts": [` +
 		`{"id": "H1", "verdict": "REFUTED", "evidence": ["a.go:1 — seconds > max — the last second is refused"]},` +
-		`{"id": "H2", "verdict": "CONFIRMED", "evidence": ["a.go:2 — empty text — read as zero"], "scenario": "empty text -> zero id", "edit": "a.go:2 — reject empty text"}` +
+		`{"id": "H2", "verdict": "CONFIRMED", "bug_priority": "low", "evidence": ["a.go:2 — empty text — read as zero"], "scenario": "empty text -> zero id", "edit": "a.go:2 — reject empty text"}` +
 		`]}`
 	checks := CheckHypothesesInFork(t.Context(), scriptForkAgent{text: reply}, ForkSettings{}, ledger, prompts.Default())
 	if len(checks) != 2 {
@@ -51,6 +51,9 @@ func TestCheckHypothesesReadsTheLedger(t *testing.T) {
 	}
 	if checks[0].Verdict != HypothesisVerdictRefuted || checks[1].Verdict != HypothesisVerdictConfirmed {
 		t.Fatalf("verdicts = %s, %s; want REFUTED and CONFIRMED", checks[0].Verdict, checks[1].Verdict)
+	}
+	if checks[1].BugPriority != BugPriorityLow {
+		t.Fatalf("bug priority = %q", checks[1].BugPriority)
 	}
 	if checks[1].Scenario != "empty text -> zero id" {
 		t.Fatalf("scenario = %q", checks[1].Scenario)

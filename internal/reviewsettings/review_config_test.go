@@ -91,7 +91,7 @@ correctness = false
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := RepoSettings{RuleFolders: []string{".team-rules"}, FailOn: "high", Correctness: false, MaxDiffBytes: 300_000}
+	want := RepoSettings{RuleFolders: []string{".team-rules"}, FailOn: "high", FailOnBugPriority: "high", Correctness: false, MaxDiffBytes: 300_000}
 	if !reflect.DeepEqual(config.Repo, want) {
 		t.Fatalf("repo settings = %+v; want %+v", config.Repo, want)
 	}

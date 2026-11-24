@@ -39,8 +39,8 @@ type CorrectnessReport struct {
 }
 
 // ReviewFailed reports whether the run must fail CI; ReviewFailureReasons says why.
-func (r ReviewReport) ReviewFailed(failOn rulecatalog.Severity, failOnUnanswered bool) bool {
-	return len(r.ReviewFailureReasons(failOn, failOnUnanswered)) > 0
+func (r ReviewReport) ReviewFailed(failOn rulecatalog.Severity, failOnBugPriority BugPriority, failOnUnanswered bool) bool {
+	return len(r.ReviewFailureReasons(failOn, failOnBugPriority, failOnUnanswered)) > 0
 }
 
 // ReviewFailureReasons lists one line per check that fails the run: a FAIL rule at or above
@@ -48,7 +48,7 @@ func (r ReviewReport) ReviewFailed(failOn rulecatalog.Severity, failOnUnanswered
 // hypothesis that is still UNSURE after its own recheck fork. An unanswered check (an ERROR rule or a generator error) is a
 // warning, because a cheap model sometimes skips the answer format; failOnUnanswered makes it
 // fail under the same severity bar as a FAIL.
-func (r ReviewReport) ReviewFailureReasons(failOn rulecatalog.Severity, failOnUnanswered bool) []string {
+func (r ReviewReport) ReviewFailureReasons(failOn rulecatalog.Severity, failOnBugPriority BugPriority, failOnUnanswered bool) []string {
 	var reasons []string
 	for _, rule := range r.Rules {
 		if rule.Severity < failOn {
@@ -65,7 +65,7 @@ func (r ReviewReport) ReviewFailureReasons(failOn rulecatalog.Severity, failOnUn
 		reasons = append(reasons, "hypothesis generator gave no answer: "+r.Correctness.GeneratorError)
 	}
 	for _, check := range r.Correctness.HypothesisCheck {
-		if check.Verdict == HypothesisVerdictConfirmed {
+		if check.Verdict == HypothesisVerdictConfirmed && check.BugPriority.orHigh().rank() >= failOnBugPriority.orHigh().rank() {
 			reasons = append(reasons, fmt.Sprintf("hypothesis %s at %s is confirmed: %s Input that breaks it: %s", check.ID, check.At, check.Question, check.Scenario))
 		}
 		if check.Verdict == HypothesisVerdictUnsure {

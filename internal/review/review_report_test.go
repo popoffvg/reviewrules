@@ -32,6 +32,7 @@ func TestReviewFailed(t *testing.T) {
 			Enabled:         true,
 			HypothesisCheck: []HypothesisCheck{{Verdict: HypothesisVerdictConfirmed}},
 		}}, false, true},
+		{"cheap-retry", ReviewReport{Correctness: CorrectnessReport{HypothesisCheck: []HypothesisCheck{{Verdict: HypothesisVerdictConfirmed, BugPriority: BugPriorityLow}}}}, false, false},
 		{"unsure-hypothesis", ReviewReport{Correctness: CorrectnessReport{
 			Enabled:         true,
 			HypothesisCheck: []HypothesisCheck{{Verdict: HypothesisVerdictUnsure}},
@@ -39,7 +40,7 @@ func TestReviewFailed(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := tc.report.ReviewFailed(rulecatalog.SeverityMedium, tc.failOnUnanswered)
+			got := tc.report.ReviewFailed(rulecatalog.SeverityMedium, BugPriorityHigh, tc.failOnUnanswered)
 			if got != tc.want {
 				t.Fatalf("ReviewFailed = %v, want %v", got, tc.want)
 			}
@@ -55,7 +56,7 @@ func TestReviewFailureReasonsNameTheHypothesis(t *testing.T) {
 			{Hypothesis: Hypothesis{ID: "H3", At: "lease.go:90", Question: "refuted one"}, Verdict: HypothesisVerdictRefuted},
 		},
 	}}
-	reasons := report.ReviewFailureReasons(rulecatalog.SeverityMedium, false)
+	reasons := report.ReviewFailureReasons(rulecatalog.SeverityMedium, BugPriorityHigh, false)
 	if len(reasons) != 1 {
 		t.Fatalf("reasons = %v, want one for H2", reasons)
 	}
@@ -73,7 +74,7 @@ func TestReviewFailureReasonsFailAnUndecidedHypothesis(t *testing.T) {
 			{Hypothesis: Hypothesis{ID: "H4", At: "ack.go:12", Question: "Does a nil token ack every notification?"}, Verdict: HypothesisVerdictUnsure, Evidence: []string{"the caller of ackBelow is in a vendored module"}},
 		},
 	}}
-	reasons := report.ReviewFailureReasons(rulecatalog.SeverityMedium, false)
+	reasons := report.ReviewFailureReasons(rulecatalog.SeverityMedium, BugPriorityHigh, false)
 	if len(reasons) != 1 {
 		t.Fatalf("reasons = %v, want one for H4", reasons)
 	}

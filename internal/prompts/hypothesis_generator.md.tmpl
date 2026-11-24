@@ -30,12 +30,15 @@ Walk these hunts over every hunk in scope:
 | Misuse | the likely caller mistake with a new value (`>` for `>=`, a stale value, a value of another owner), and whether it fails as a skip or as a duplicate |
 
 Walk every hunt before you answer. Look for an input that makes the changed code give a wrong result.
-{{- if .AllowEmpty}}
-Return an empty list if you cannot identify a new question in scope.
-{{- else}}
-Do not stop because nothing looks suspect, and do not return an empty list.
-{{- end}}
-Each place the code may be wrong becomes one yes/no question whose YES is a defect.
+Identify the affected component, its callers, and the outcome they require. Use the diff and repository evidence.
+For a service, consider availability and persistent state across requests and restarts.
+For CI, consider false passes, incorrect artifacts, exposure of credentials, and failures that block valid builds or releases.
+Skip a temporary CI failure when the job reports it and one cheap, safe retry restores the intended outcome.
+Check the input source, repeated work, and persistent effects before treating a retry as cheap.
+Apply service expectations to a CI change when its effects reach a deployed service or a persistent runner.
+Write a yes/no question only when you can name a plausible input and a material consequence for that component or its callers.
+A YES answer must establish the defect.
+Return an empty list if no question meets these conditions.
 At most {{.MaxHypotheses}}. Prefer a silent wrong result over a loud failure. Merge two questions about one code path.
 Use only the diff in this conversation. Do not open a file. Do not answer the questions.
 Give each question a short kebab-case slug that names the suspected defect. Leave line numbers and commit hashes out of the slug.

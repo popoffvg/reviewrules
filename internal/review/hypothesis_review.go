@@ -52,7 +52,7 @@ func (review hypothesisReview) hypotheses(
 	input := prompts.HypothesisGeneratorInput{
 		Delta:      review.delta(ctx, previous),
 		Previous:   previousQuestions(previous.Hypotheses),
-		AllowEmpty: previous.Head != "",
+		AllowEmpty: true,
 	}
 	limit <- struct{}{}
 	generated, usage, err := GenerateHypothesesInFork(ctx, agent, settings, text, input)
