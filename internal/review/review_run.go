@@ -140,7 +140,10 @@ func RunReview(
 	}
 	review := hypothesisReview{config: cfg, diff: diff, ignorePatterns: catalog.IgnorePatterns}
 	if cfg.CorrectnessEnabled {
-		review.contextDigest = digest.SHA256Hex(text.ReviewSystem + "\x00" + text.ParentSession(parent))
+		// The --context notes answer findings and leave the questions valid; a new note must not regenerate them from the full diff.
+		cacheParent := parent
+		cacheParent.RunContext = nil
+		review.contextDigest = digest.SHA256Hex(text.ReviewSystem + "\x00" + text.ParentSession(cacheParent))
 	}
 	parent.ChangedFiles = diff.ChangedFiles
 	parent.Patch = diff.Patch

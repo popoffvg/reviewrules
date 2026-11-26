@@ -11,6 +11,8 @@ The diff and the convention docs are already in the conversation. Do not open a 
 Do not write a plan or the steps. Reply with one json block and nothing else.
 One check per requirement. Evidence is one line: the added line that breaks it, what you compared, or "no added line of this kind".
 A FAIL check needs the file:line of an added line. findings repeats every FAIL, one per violating line.
+Walk every added line of every changed file before you answer. findings lists every violating line in the diff, not the first ones: the author fixes only the lines you list.
+When one fact or one block is written in more than one place, write one finding whose message names every file:line of it.
 
 ```json
 {"checks": [{"requirement": "one item of the rule", "status": "PASS or FAIL or N/A", "evidence": "file:line — one line"}],

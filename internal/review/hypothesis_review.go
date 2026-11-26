@@ -29,7 +29,7 @@ func (review hypothesisReview) hypotheses(
 	settings ForkSettings,
 	text prompts.Set,
 ) ([]Hypothesis, fantasy.Usage, error) {
-	template := hypothesisGeneratorPrompt(text, prompts.HypothesisGeneratorInput{})
+	template := hypothesisGeneratorPrompt(text, prompts.HypothesisGeneratorInput{Hunts: allHypothesisHunts()})
 	review.contextDigest = digest.SHA256Hex(strings.Join([]string{
 		review.contextDigest, template, review.config.GeneratorBackend,
 		settings.Model, settings.ReasoningEffort, strconv.Itoa(settings.MaxSteps),
@@ -54,14 +54,13 @@ func (review hypothesisReview) hypotheses(
 		Previous:   previousQuestions(previous.Hypotheses),
 		AllowEmpty: true,
 	}
-	limit <- struct{}{}
-	generated, usage, err := GenerateHypothesesInFork(ctx, agent, settings, text, input)
-	<-limit
+	generated, usage, err := generateHypothesesByHuntGroup(ctx, agent, limit, settings, text, input)
 	logger.Info("review hypothesis generator done", "hypotheses", len(generated), "usage", usage.String())
-	if err != nil {
-		return previous.Hypotheses, usage, err
-	}
 	hypotheses := mergeHypotheses(previous.Hypotheses, generated, review.diff.Head)
+	// A failed hunt group leaves the cache as it was, so the next run walks that group over the same delta again.
+	if err != nil {
+		return hypotheses, usage, err
+	}
 	err = cache.save(ctx, stamp, hypothesisSnapshot{
 		Head: review.diff.Head, MergeBase: review.diff.MergeBase, PatchDigest: patchDigest,
 		ContextDigest: review.contextDigest, Worktree: review.config.IncludeWorktree, Hypotheses: hypotheses,

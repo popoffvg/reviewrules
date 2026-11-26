@@ -36,7 +36,7 @@ func TestReviewHypothesesAcrossBranchRuns(t *testing.T) {
 	}
 	first := runHypothesisReview(t, cfg, `{"hypotheses":[{"slug":"first-defect","at":"first.txt:1","question":"Can the first change fail?"}]}`)
 	firstCommit := first.report.Commit
-	if firstCommit == "" || len(first.agent.generators) != 1 || len(first.report.Correctness.HypothesisCheck) != 1 {
+	if firstCommit == "" || len(first.agent.generators) != len(hypothesisHuntGroups()) || len(first.report.Correctness.HypothesisCheck) != 1 {
 		t.Fatalf("first review = %+v", first.report)
 	}
 	if got := first.report.Correctness.HypothesisCheck[0].Commit; got != firstCommit {
@@ -48,12 +48,12 @@ func TestReviewHypothesesAcrossBranchRuns(t *testing.T) {
 	}
 	runHypothesisGit(t, repo, "commit", "--allow-empty", "-m", "Advance branch HEAD")
 	newHead := runHypothesisReview(t, cfg, `{"hypotheses":[]}`)
-	if newHead.report.Commit == firstCommit || len(newHead.agent.generators) != 1 || len(newHead.agent.checks) != 1 {
+	if newHead.report.Commit == firstCommit || len(newHead.agent.generators) != len(hypothesisHuntGroups()) || len(newHead.agent.checks) != 1 {
 		t.Fatal("new HEAD with an unchanged patch must run both generation and the old check")
 	}
 	cfg.HypothesisModelName = "other-generator"
 	newModel := runHypothesisReview(t, cfg, `{"hypotheses":[]}`)
-	if len(newModel.agent.generators) != 1 || len(newModel.agent.checks) != 1 {
+	if len(newModel.agent.generators) != len(hypothesisHuntGroups()) || len(newModel.agent.checks) != 1 {
 		t.Fatal("changed generator model must run generation and the old check")
 	}
 	err = os.WriteFile(filepath.Join(repo, ".reviewrules", "config.json"), []byte(`{"instructions":"Check empty values."}`), 0o600)
@@ -61,13 +61,19 @@ func TestReviewHypothesesAcrossBranchRuns(t *testing.T) {
 		t.Fatal(err)
 	}
 	newContext := runHypothesisReview(t, cfg, `{"hypotheses":[]}`)
-	if len(newContext.agent.generators) != 1 || len(newContext.agent.checks) != 1 {
+	if len(newContext.agent.generators) != len(hypothesisHuntGroups()) || len(newContext.agent.checks) != 1 {
 		t.Fatal("changed instructions must regenerate and run the old check")
 	}
+	cfg.RunContext = []string{"first.txt:1: the change is by design"}
+	newNote := runHypothesisReview(t, cfg, "")
+	if len(newNote.agent.generators) != 0 || len(newNote.agent.checks) != 1 {
+		t.Fatal("a new --context note must reuse the questions and run the old check")
+	}
+	cfg.RunContext = nil
 
 	writeHypothesisFile(t, repo, "second.txt", "second-branch-change\n")
 	next := runHypothesisReview(t, cfg, `{"hypotheses":[{"slug":"first-defect","at":"first.txt:1","question":"Can the first change fail?","hunt":"Callers","look":"updated caller"},{"slug":"first-defect","at":"second.txt:1","question":"Can the first change fail?"}]}`)
-	if len(next.agent.generators) != 1 || len(next.agent.checks) != 1 || len(next.report.Correctness.HypothesisCheck) != 2 {
+	if len(next.agent.generators) != len(hypothesisHuntGroups()) || len(next.agent.checks) != 1 || len(next.report.Correctness.HypothesisCheck) != 2 {
 		t.Fatalf("next review launched %d generators and %d checks", len(next.agent.generators), len(next.agent.checks))
 	}
 	prompt := next.agent.generators[0]
@@ -90,7 +96,7 @@ func TestReviewHypothesesAcrossBranchRuns(t *testing.T) {
 	runHypothesisGit(t, repo, "switch", "-c", "another-branch")
 	coldReply := `{"hypotheses":[{"slug":"cold-defect","question":"Can the cold change fail?"}]}`
 	other := runHypothesisReview(t, cfg, coldReply)
-	if len(other.agent.generators) != 1 || len(other.report.Correctness.HypothesisCheck) != 1 {
+	if len(other.agent.generators) != len(hypothesisHuntGroups()) || len(other.report.Correctness.HypothesisCheck) != 1 {
 		t.Fatal("another branch reused the first branch's hypotheses")
 	}
 	runHypothesisGit(t, repo, "switch", firstBranch)
@@ -100,7 +106,7 @@ func TestReviewHypothesesAcrossBranchRuns(t *testing.T) {
 		t.Fatal(err)
 	}
 	dirty := runHypothesisReview(t, cfg, `{"hypotheses":[]}`)
-	if len(dirty.agent.generators) != 1 || strings.Contains(dirty.agent.generators[0], "affected by the delta below") || len(dirty.report.Correctness.HypothesisCheck) != 2 {
+	if len(dirty.agent.generators) != len(hypothesisHuntGroups()) || strings.Contains(dirty.agent.generators[0], "affected by the delta below") || len(dirty.report.Correctness.HypothesisCheck) != 2 {
 		t.Fatal("changed worktree must use the full captured diff")
 	}
 	dirtyAgain := runHypothesisReview(t, cfg, "")
@@ -112,7 +118,7 @@ func TestReviewHypothesesAcrossBranchRuns(t *testing.T) {
 		t.Fatal(err)
 	}
 	dirtyChanged := runHypothesisReview(t, cfg, `{"hypotheses":[]}`)
-	if len(dirtyChanged.agent.generators) != 1 || len(dirtyChanged.report.Correctness.HypothesisCheck) != 2 {
+	if len(dirtyChanged.agent.generators) != len(hypothesisHuntGroups()) || len(dirtyChanged.report.Correctness.HypothesisCheck) != 2 {
 		t.Fatal("changed worktree did not regenerate and verify earlier questions")
 	}
 	if strings.Contains(dirtyChanged.agent.generators[0], "affected by the delta below") {
@@ -122,7 +128,7 @@ func TestReviewHypothesesAcrossBranchRuns(t *testing.T) {
 	runHypothesisGit(t, repo, "switch", "--detach")
 	cfg.IncludeWorktree = false
 	detached := runHypothesisReview(t, cfg, coldReply)
-	if len(detached.agent.generators) != 1 || len(detached.report.Correctness.HypothesisCheck) != 1 {
+	if len(detached.agent.generators) != len(hypothesisHuntGroups()) || len(detached.report.Correctness.HypothesisCheck) != 1 {
 		t.Fatal("detached review used the branch's cached questions")
 	}
 

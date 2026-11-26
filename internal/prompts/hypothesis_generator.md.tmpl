@@ -20,14 +20,12 @@ Rules, names, comments, tests, and idiom are checked elsewhere. Never report the
 Walk these hunts over every hunk in scope:
 | Hunt | Look for |
 |---|---|
-| Boundaries | off-by-one, inclusive vs exclusive end, empty collection, first and last item |
-| Absent values | nil, empty string, zero, missing map key, an optional not set |
-| Error paths | an error dropped, logged and ignored, or turned into a success value |
-| Concurrency | a new shared value read or written from two goroutines with no guard |
-| Callers | a changed signature, return value, or meaning whose callers were not updated |
-| Pairs | an open, register, lock, or mark whose close runs in a hook or callback of another layer; an exit of a caller up the stack that skips it |
-| Ownership | a token, ID, or cursor that one owner (queue, subscription, process, user) issues and that another owner can pass back |
-| Misuse | the likely caller mistake with a new value (`>` for `>=`, a stale value, a value of another owner), and whether it fails as a skip or as a duplicate |
+{{- range .Hunts}}
+| {{.Name}} | {{.LookFor}} |
+{{- end}}
+
+Other agents walk the other hunts. Walk only these hunts, and walk each one over every hunk: a question for one hunk does not end the hunt.
+When one input breaks one path, ask the same question for each sibling path the diff adds: every handler, every write, every exit.
 
 Walk every hunt before you answer. Look for an input that makes the changed code give a wrong result.
 Identify the affected component, its callers, and the outcome they require. Use the diff and repository evidence.

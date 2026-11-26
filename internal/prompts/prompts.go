@@ -67,12 +67,20 @@ type RuleCheckInput struct {
 }
 
 // HypothesisGeneratorInput scopes new questions to the branch delta when available.
+// Hunts are the rows of the hunt table that this generator fork walks.
 type HypothesisGeneratorInput struct {
 	MaxHypotheses int
+	Hunts         []Hunt
 	Delta         string
 	Previous      string
 	Example       string
 	AllowEmpty    bool
+}
+
+// Hunt is one row of the generator's hunt table: a kind of defect and what to look for.
+type Hunt struct {
+	Name    string
+	LookFor string
 }
 
 // HypothesisCheckInput is the ledger one checker fork answers.
