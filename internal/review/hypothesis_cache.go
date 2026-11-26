@@ -34,6 +34,7 @@ type hypothesisSnapshot struct {
 	ContextDigest string       `json:"context_digest"`
 	PatchDigest   string       `json:"patch_digest"`
 	Worktree      bool         `json:"worktree"`
+	Notes         []string     `json:"notes"`
 	Hypotheses    []Hypothesis `json:"hypotheses"`
 }
 

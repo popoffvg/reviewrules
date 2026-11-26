@@ -140,7 +140,7 @@ func RunReview(
 	}
 	review := hypothesisReview{config: cfg, diff: diff, ignorePatterns: catalog.IgnorePatterns}
 	if cfg.CorrectnessEnabled {
-		// The --context notes answer findings and leave the questions valid; a new note must not regenerate them from the full diff.
+		// A new --context note keeps the cached questions; keepsNotes regenerates them when a note they were written under is gone.
 		cacheParent := parent
 		cacheParent.RunContext = nil
 		review.contextDigest = digest.SHA256Hex(text.ReviewSystem + "\x00" + text.ParentSession(cacheParent))

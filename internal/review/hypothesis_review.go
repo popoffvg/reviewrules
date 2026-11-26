@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -44,7 +45,7 @@ func (review hypothesisReview) hypotheses(
 	}
 	patchDigest := digest.SHA256Hex(review.diff.Patch)
 	if previous.Head == review.diff.Head && previous.MergeBase == review.diff.MergeBase &&
-		previous.ContextDigest == review.contextDigest && previous.PatchDigest == patchDigest {
+		previous.ContextDigest == review.contextDigest && previous.PatchDigest == patchDigest && review.keepsNotes(previous) {
 		logger.Info("hypothesis cache reused unchanged diff", "hypotheses", len(previous.Hypotheses))
 		return previous.Hypotheses, fantasy.Usage{}, nil
 	}
@@ -63,7 +64,8 @@ func (review hypothesisReview) hypotheses(
 	}
 	err = cache.save(ctx, stamp, hypothesisSnapshot{
 		Head: review.diff.Head, MergeBase: review.diff.MergeBase, PatchDigest: patchDigest,
-		ContextDigest: review.contextDigest, Worktree: review.config.IncludeWorktree, Hypotheses: hypotheses,
+		ContextDigest: review.contextDigest, Worktree: review.config.IncludeWorktree, Notes: review.config.RunContext,
+		Hypotheses: hypotheses,
 	})
 	if err != nil {
 		logger.Warn("hypothesis cache write failed", "error", err)
@@ -91,7 +93,8 @@ func checkHypothesisBatches(
 
 func (review hypothesisReview) delta(ctx context.Context, previous hypothesisSnapshot) string {
 	cfg := review.config
-	if cfg.IncludeWorktree || previous.MergeBase != review.diff.MergeBase || previous.ContextDigest != review.contextDigest {
+	if cfg.IncludeWorktree || previous.MergeBase != review.diff.MergeBase || previous.ContextDigest != review.contextDigest ||
+		!review.keepsNotes(previous) {
 		return ""
 	}
 	pathspec := reviewPathspec(review.ignorePatterns)
@@ -106,6 +109,16 @@ func (review hypothesisReview) delta(ctx context.Context, previous hypothesisSna
 		return ""
 	}
 	return delta
+}
+
+// keepsNotes reports whether every --context note the cached questions were written under is still given; a removed note can hide a question it suppressed.
+func (review hypothesisReview) keepsNotes(previous hypothesisSnapshot) bool {
+	for _, note := range previous.Notes {
+		if !slices.Contains(review.config.RunContext, note) {
+			return false
+		}
+	}
+	return true
 }
 
 func previousQuestions(hypotheses []Hypothesis) string {

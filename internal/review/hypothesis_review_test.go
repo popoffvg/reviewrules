@@ -69,7 +69,13 @@ func TestReviewHypothesesAcrossBranchRuns(t *testing.T) {
 	if len(newNote.agent.generators) != 0 || len(newNote.agent.checks) != 1 {
 		t.Fatal("a new --context note must reuse the questions and run the old check")
 	}
+	runHypothesisGit(t, repo, "commit", "--allow-empty", "-m", "Write questions under a note")
+	runHypothesisReview(t, cfg, `{"hypotheses":[]}`)
 	cfg.RunContext = nil
+	droppedNote := runHypothesisReview(t, cfg, `{"hypotheses":[]}`)
+	if len(droppedNote.agent.generators) != len(hypothesisHuntGroups()) || len(droppedNote.agent.checks) != 1 {
+		t.Fatal("a removed --context note must regenerate the questions and run the old check")
+	}
 
 	writeHypothesisFile(t, repo, "second.txt", "second-branch-change\n")
 	next := runHypothesisReview(t, cfg, `{"hypotheses":[{"slug":"first-defect","at":"first.txt:1","question":"Can the first change fail?","hunt":"Callers","look":"updated caller"},{"slug":"first-defect","at":"second.txt:1","question":"Can the first change fail?"}]}`)
