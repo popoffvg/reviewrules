@@ -19,7 +19,7 @@ type ReviewFlags struct {
 	Worktree    bool     `long:"worktree"     description:"review uncommitted changes too (local run before a push)"`
 	JSONOut     string   `long:"json-out"     description:"write the JSON report to this file, or to stdout with \"-\"; with CI=true and no flag it goes to stdout" default-mask:"none"`
 	PrintConfig bool     `long:"print-config" description:"print every merged config value and the file that gave it, then exit without a review"`
-	Context     []string `long:"context" description:"a note for the reviewer on this run, such as why a finding is by design; one line; the reviewer checks it against the code; repeat the flag for more notes"`
+	Context     []string `long:"context" description:"a note for the reviewer on this run, such as why a finding is by design; one line; the reviewer checks it against the code; repeat the flag for more notes; to take a note back, remove or change it, which writes the questions again"`
 }
 
 // DefaultReviewFlags is what a run uses for the flags the command line does not set.

@@ -19,7 +19,7 @@ See [review results](review-results.md) for verdicts, failure policy, usage, and
 
 The cache scopes questions to a Git repository, branch, and review base. Each question has a stable slug and the HEAD commit when the generator first wrote it. The report records the commit reviewed in the current run.
 
-Unchanged review inputs skip the generator. A new `--context` note does not count as a change: the notes answer findings and leave the questions valid. After a commit, the generator focuses on the changes since the last cached review. When one hunt group fails, the run checks the questions of the other groups and keeps the cache as it was, so the next run walks the failed group again. If a worktree review changes, the generator uses the full diff already captured for that run.
+Unchanged review inputs skip the generator. A new `--context` note does not count as a change: the notes answer findings and leave the questions valid. A removed or changed note does count, because the questions written under it can leave out what the note claimed; so to take back a note, remove or change it rather than add a correction. After a commit, the generator focuses on the changes since the last cached review. When one hunt group fails, the run checks the questions of the other groups and keeps the cache as it was, so the next run walks the failed group again. If a worktree review changes, the generator uses the full diff already captured for that run.
 
 The disk cache removes the least recently used entries first when it needs space. Every run verifies the questions against the current diff.
 
