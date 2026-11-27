@@ -64,14 +64,7 @@ func CheckRuleInFork(
 	rule rulecatalog.ReviewRule,
 	text prompts.Set,
 ) RuleCheckResult {
-	check := RuleCheckResult{
-		RuleID:   rule.ID,
-		Severity: rule.Severity,
-		Profile:  rule.Profile,
-		Model:    settings.Model,
-		Verdict:  RuleVerdictError,
-		Findings: []RuleFinding{},
-	}
+	check := newRuleCheckResult(rule, settings)
 	prompt := text.RuleCheck(prompts.RuleCheckInput{ID: rule.ID, Severity: rule.Severity.String(), Text: rule.Text})
 	fork, err := agent.ForkParentSession(ctx, prompt, settings)
 	if err != nil {
@@ -98,6 +91,18 @@ func CheckRuleInFork(
 		check.Findings = reply.Findings
 	}
 	return check
+}
+
+// newRuleCheckResult has no verdict yet: a check that ends before its answer stays RuleVerdictError.
+func newRuleCheckResult(rule rulecatalog.ReviewRule, settings ForkSettings) RuleCheckResult {
+	return RuleCheckResult{
+		RuleID:   rule.ID,
+		Severity: rule.Severity,
+		Profile:  rule.Profile,
+		Model:    settings.Model,
+		Verdict:  RuleVerdictError,
+		Findings: []RuleFinding{},
+	}
 }
 
 // ruleVerdictFromChecks takes the verdict from the per-requirement checks, not from the

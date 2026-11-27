@@ -22,9 +22,11 @@ import (
 const hypothesisCacheBytes = 200_000_000
 const hypothesisCacheSuffix = ".hypotheses.json"
 
-type hypothesisCache struct {
+// branchCache is one JSON cache entry of a branch; suffix names its kind, such as hypothesisCacheSuffix.
+type branchCache struct {
 	dir      string
 	key      string
+	suffix   string
 	maxBytes int64
 }
 
@@ -40,73 +42,109 @@ type hypothesisSnapshot struct {
 	Verdicts map[string]cachedVerdict `json:"verdicts,omitempty"`
 }
 
-func branchHypothesisCache(ctx context.Context, cfg ReviewRunConfig, diff ReviewDiff, ignorePatterns []string) (hypothesisCache, error) {
+func branchHypothesisCache(ctx context.Context, cfg ReviewRunConfig, diff ReviewDiff, ignorePatterns []string) (branchCache, error) {
+	return branchCacheEntry(ctx, cfg, diff, ignorePatterns, hypothesisCacheSuffix)
+}
+
+// branchCacheEntry scopes the entry to the repo, the branch, and the base. A detached HEAD has no entry.
+func branchCacheEntry(
+	ctx context.Context, cfg ReviewRunConfig, diff ReviewDiff, ignorePatterns []string, suffix string,
+) (branchCache, error) {
 	if cfg.HypothesisCacheDir == "" {
-		return hypothesisCache{}, nil
+		return branchCache{}, nil
 	}
 	branch, err := runGit(ctx, cfg.RepoRoot, "symbolic-ref", "--quiet", "HEAD")
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
-		return hypothesisCache{}, nil
+		return branchCache{}, nil
 	}
 	if err != nil {
-		return hypothesisCache{}, err
+		return branchCache{}, fmt.Errorf("cache scope: read the branch of %s: %w", cfg.RepoRoot, err)
 	}
 	branch = strings.TrimSpace(branch)
 	location, err := runGit(ctx, cfg.RepoRoot, "rev-parse", "--path-format=absolute", "--git-common-dir", "--show-prefix", branch)
 	if err != nil {
-		return hypothesisCache{}, err
+		return branchCache{}, fmt.Errorf("cache scope: locate branch %s: %w", branch, err)
 	}
 	fields := strings.SplitN(strings.TrimSuffix(location, "\n"), "\n", 3)
 	if len(fields) != 3 || fields[2] != diff.Head {
-		return hypothesisCache{}, nil
+		return branchCache{}, nil
 	}
 	commonDir, prefix := fields[0], fields[1]
 	commonDir, err = filepath.EvalSymlinks(commonDir)
 	if err != nil {
-		return hypothesisCache{}, err
+		return branchCache{}, fmt.Errorf("cache scope: resolve %s: %w", commonDir, err)
 	}
 	scope := []string{commonDir, prefix, branch, cfg.Base}
 	scope = append(scope, ignorePatterns...)
-	return hypothesisCache{
+	return branchCache{
 		dir: cfg.HypothesisCacheDir, key: digest.SHA256Hex(strings.Join(scope, "\x00")),
-		maxBytes: hypothesisCacheBytes,
+		suffix: suffix, maxBytes: hypothesisCacheBytes,
 	}, nil
 }
 
-func (cache hypothesisCache) load(ctx context.Context) (hypothesisSnapshot, string, error) {
-	if cache.key == "" {
-		return hypothesisSnapshot{}, "", nil
-	}
-	root, closeCache, err := cache.open(ctx)
-	if err != nil {
-		return hypothesisSnapshot{}, "", err
-	}
-	defer closeCache()
-	data, stamp, err := cache.read(root)
-	if err != nil || data == nil {
-		return hypothesisSnapshot{}, stamp, err
-	}
+func (cache branchCache) load(ctx context.Context) (hypothesisSnapshot, string, error) {
 	var snapshot hypothesisSnapshot
-	err = json.Unmarshal(data, &snapshot)
-	if err != nil {
-		return hypothesisSnapshot{}, stamp, fmt.Errorf("hypothesis cache entry decode failed: %w", err)
+	found, stamp, err := cache.loadJSON(ctx, &snapshot)
+	if err != nil || !found {
+		return hypothesisSnapshot{}, stamp, err
 	}
 	if !isGitCommit(snapshot.Head) || !isGitCommit(snapshot.MergeBase) {
 		return hypothesisSnapshot{}, stamp, fmt.Errorf("hypothesis cache entry has an invalid commit")
 	}
-	now := time.Now()
-	err = root.Chtimes(cache.fileName(), now, now)
-	return snapshot, stamp, err
+	return snapshot, stamp, nil
 }
 
-func (cache hypothesisCache) save(ctx context.Context, expected string, snapshot hypothesisSnapshot) error {
+// loadJSON decodes the entry into target and marks it used. found is false when the entry is absent or over budget.
+func (cache branchCache) loadJSON(ctx context.Context, target any) (bool, string, error) {
+	if cache.key == "" {
+		return false, "", nil
+	}
+	found, stamp, err := cache.decode(ctx, target)
+	if err != nil {
+		return false, stamp, fmt.Errorf("load cache entry %s in %s: %w", cache.fileName(), cache.dir, err)
+	}
+	return found, stamp, nil
+}
+
+func (cache branchCache) decode(ctx context.Context, target any) (bool, string, error) {
+	root, closeCache, err := cache.open(ctx)
+	if err != nil {
+		return false, "", err
+	}
+	defer closeCache()
+	data, stamp, err := cache.read(root)
+	if err != nil || data == nil {
+		return false, stamp, err
+	}
+	err = json.Unmarshal(data, target)
+	if err != nil {
+		return false, stamp, fmt.Errorf("decode: %w", err)
+	}
+	now := time.Now()
+	err = root.Chtimes(cache.fileName(), now, now)
+	if err != nil {
+		return false, stamp, fmt.Errorf("mark used: %w", err)
+	}
+	return true, stamp, nil
+}
+
+// save writes entry when the stored entry still has the stamp expected, so a run never overwrites a newer run.
+func (cache branchCache) save(ctx context.Context, expected string, entry any) error {
 	if cache.key == "" {
 		return nil
 	}
-	data, err := json.Marshal(snapshot)
+	err := cache.write(ctx, expected, entry)
 	if err != nil {
-		return err
+		return fmt.Errorf("save cache entry %s in %s: %w", cache.fileName(), cache.dir, err)
+	}
+	return nil
+}
+
+func (cache branchCache) write(ctx context.Context, expected string, entry any) error {
+	data, err := json.Marshal(entry)
+	if err != nil {
+		return fmt.Errorf("encode: %w", err)
 	}
 	root, closeCache, err := cache.open(ctx)
 	if err != nil {
@@ -122,51 +160,55 @@ func (cache hypothesisCache) save(ctx context.Context, expected string, snapshot
 		if current != "" {
 			removeErr = root.Remove(cache.fileName())
 		}
-		return errors.Join(fmt.Errorf("hypothesis snapshot exceeds the cache budget: %d bytes", len(data)), removeErr)
+		return errors.Join(fmt.Errorf("entry exceeds the cache budget: %d bytes", len(data)), removeErr)
 	}
-	const pending = ".hypotheses-pending"
+	const pending = ".branch-cache-pending"
 	err = root.Remove(pending)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return err
+		return fmt.Errorf("remove the old %s: %w", pending, err)
 	}
 	file, err := root.OpenFile(pending, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
-		return err
+		return fmt.Errorf("create %s: %w", pending, err)
 	}
 	defer func() { _ = root.Remove(pending) }()
 	_, writeErr := file.Write(data)
 	err = errors.Join(writeErr, file.Close())
 	if err != nil {
-		return err
+		return fmt.Errorf("write %s: %w", pending, err)
 	}
 	err = cache.evict(root, int64(len(data)))
 	if err != nil {
-		return err
+		return fmt.Errorf("evict old entries: %w", err)
 	}
-	return root.Rename(pending, cache.fileName())
+	err = root.Rename(pending, cache.fileName())
+	if err != nil {
+		return fmt.Errorf("rename %s to the entry: %w", pending, err)
+	}
+	return nil
 }
 
-func (cache hypothesisCache) open(ctx context.Context) (*os.Root, func(), error) {
+func (cache branchCache) open(ctx context.Context) (*os.Root, func(), error) {
 	err := os.MkdirAll(cache.dir, 0o700)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("create the cache dir: %w", err)
 	}
-	lock := flock.New(filepath.Join(cache.dir, ".hypotheses-lock"))
+	lock := flock.New(filepath.Join(cache.dir, ".branch-cache-lock"))
 	lockContext, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 	locked, err := lock.TryLockContext(lockContext, 25*time.Millisecond)
 	if err != nil {
 		_ = lock.Close()
-		return nil, nil, fmt.Errorf("hypothesis cache lock failed: %w", err)
+		return nil, nil, fmt.Errorf("lock the cache dir: %w", err)
 	}
 	if !locked {
 		_ = lock.Close()
-		return nil, nil, fmt.Errorf("hypothesis cache lock unavailable")
+		return nil, nil, fmt.Errorf("lock the cache dir: another run holds the lock")
 	}
 	root, err := os.OpenRoot(cache.dir)
 	if err != nil {
 		_ = lock.Close()
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("open the cache dir: %w", err)
 	}
 	return root, func() {
 		_ = root.Close()
@@ -174,38 +216,38 @@ func (cache hypothesisCache) open(ctx context.Context) (*os.Root, func(), error)
 	}, nil
 }
 
-func (cache hypothesisCache) read(root *os.Root) ([]byte, string, error) {
+func (cache branchCache) read(root *os.Root) ([]byte, string, error) {
 	name := cache.fileName()
 	info, err := root.Lstat(name)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, "", nil
 	}
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("stat the entry: %w", err)
 	}
 	if !info.Mode().IsRegular() {
-		return nil, "", fmt.Errorf("hypothesis cache entry is not a regular file")
+		return nil, "", fmt.Errorf("the entry is not a regular file")
 	}
 	if info.Size() > cache.maxBytes {
 		return nil, "oversize", nil
 	}
 	data, err := root.ReadFile(name)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("read the entry: %w", err)
 	}
 	stamp := digest.SHA256Hex(string(data))
 	return data, stamp, nil
 }
 
-func (cache hypothesisCache) evict(root *os.Root, incoming int64) error {
+func (cache branchCache) evict(root *os.Root, incoming int64) error {
 	files, err := fs.ReadDir(root.FS(), ".")
 	if err != nil {
-		return err
+		return fmt.Errorf("list %s: %w", cache.dir, err)
 	}
 	var entries []fs.FileInfo
 	total := incoming
 	for _, file := range files {
-		key, entry := strings.CutSuffix(file.Name(), hypothesisCacheSuffix)
+		key, entry := strings.CutSuffix(file.Name(), cache.suffix)
 		if !entry || len(key) != sha256.Size*2 || file.Name() == cache.fileName() {
 			continue
 		}
@@ -214,7 +256,7 @@ func (cache hypothesisCache) evict(root *os.Root, incoming int64) error {
 		}
 		info, err := file.Info()
 		if err != nil {
-			return err
+			return fmt.Errorf("stat %s: %w", file.Name(), err)
 		}
 		if info.Mode().IsRegular() {
 			entries = append(entries, info)
@@ -228,15 +270,15 @@ func (cache hypothesisCache) evict(root *os.Root, incoming int64) error {
 		}
 		err = root.Remove(entry.Name())
 		if err != nil {
-			return err
+			return fmt.Errorf("remove %s: %w", entry.Name(), err)
 		}
 		total -= entry.Size()
 	}
 	return nil
 }
 
-func (cache hypothesisCache) fileName() string {
-	return cache.key + hypothesisCacheSuffix
+func (cache branchCache) fileName() string {
+	return cache.key + cache.suffix
 }
 
 func isGitCommit(commit string) bool {

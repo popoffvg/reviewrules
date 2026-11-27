@@ -5,7 +5,7 @@ A run of reviewrules does these steps in this order:
 1. Load the rules and the docs from the rule folders. Drop each rule whose `scope` matches no changed file.
 2. Diff `merge-base(--base, HEAD)` against `HEAD`, or against the working tree with `--worktree`. Paths in `ignorePatterns` are left out.
 3. Run the **parent session** once. Its first message holds the instructions, the scoped docs, and the diff. The parent maps the change and gives no verdict.
-4. After the parent session finishes, run every rule check as a **fork** of it. A fork is a new call that starts with the parent's full history, allowing the provider to reuse its prompt cache.
+4. After the parent session finishes, run every rule check as a **fork** of it. A fork is a new call that starts with the parent's full history, allowing the provider to reuse its prompt cache. A `light` rule gets one fork per small batch of hunks that add a line, and answers each hunk on its own; see [Rule hunk cache](#rule-hunk-cache).
 5. Load the previous correctness hypotheses for the branch. Generate new hypotheses when the diff or review instructions change. Three generator forks run in parallel, one per hunt group: data (boundaries, absent values), failure (error paths, callers, pairs), and interleaving (concurrency, ownership, misuse). Each fork has its own cap, so a question in one group does not end the walk of another. Reuse the cached verdict of each hypothesis whose inputs did not change, and verify the other hypotheses in batches. Each hypothesis that stays `UNSURE` gets another fork with that row and the reason it stayed open.
 6. Print the summary, write the JSON report when asked, and exit.
 
@@ -38,6 +38,16 @@ A `--worktree` run, and a run while a tracked file has an uncommitted edit, chec
 The summary marks a reused verdict with `reused from <commit>`, and the JSON report sets `reused_from`. A reused verdict has no usage.
 
 The run writes the questions and the verdicts in one cache write, after the checks.
+
+## Rule hunk cache
+
+A `light` rule runs on a cheap model. One verdict over the whole diff names only the first hit it sees, and the next run finds another one. So a `light` rule judges each hunk that adds a line, and the cache keeps the verdict of each hunk for the branch and the base. A run reuses the verdict of a hunk, and asks no fork about it, when all of these hold:
+
+- The hunk has the same file and the same lines. Only a hunk that moved keeps its verdict: a finding keeps its place in the hunk.
+- The rule text, the severity, the prompt, the review instructions and docs, the backend, and the fork settings are the same.
+- Every `--context` note of the judged run is still given, and no note was added since, or the verdict is not `FAIL`.
+
+Two hunks with the same lines in one file keep separate verdicts. A reply that skips a listed hunk, or gives it a finding outside the lines the hunk adds, gives the rule no verdict. The next run asks only about that hunk. A run with no `light` rule, a `--worktree` run, and a run while a tracked file has an uncommitted edit leave the cache entry as they found it, because their forks can read files that no commit holds.
 
 ## Cache size
 
