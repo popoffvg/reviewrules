@@ -22,19 +22,17 @@ type hypothesisReview struct {
 	contextDigest  string
 }
 
-func (review hypothesisReview) hypotheses(
+// checkedHypotheses reads the branch's hypothesis cache, writes the questions, reuses each cached verdict
+// that still holds, checks the other questions, and writes the questions and the verdicts back in one cache write.
+func (review hypothesisReview) checkedHypotheses(
 	ctx context.Context,
 	logger *slog.Logger,
 	agent ReviewForkAgent,
 	limit chan struct{},
-	settings ForkSettings,
+	generatorSettings ForkSettings,
+	checkSettings ForkSettings,
 	text prompts.Set,
-) ([]Hypothesis, fantasy.Usage, error) {
-	template := hypothesisGeneratorPrompt(text, prompts.HypothesisGeneratorInput{Hunts: allHypothesisHunts()})
-	review.contextDigest = digest.SHA256Hex(strings.Join([]string{
-		review.contextDigest, template, review.config.GeneratorBackend,
-		settings.Model, settings.ReasoningEffort, strconv.Itoa(settings.MaxSteps),
-	}, "\x00"))
+) ([]HypothesisCheck, fantasy.Usage, error) {
 	cache, err := branchHypothesisCache(ctx, review.config, review.diff, review.ignorePatterns)
 	if err != nil {
 		logger.Warn("hypothesis cache scope unavailable", "error", err)
@@ -43,11 +41,39 @@ func (review hypothesisReview) hypotheses(
 	if err != nil {
 		logger.Warn("hypothesis cache read failed", "error", err)
 	}
+	snapshot, usage, generatorErr := review.hypotheses(ctx, logger, agent, limit, generatorSettings, text, previous)
+	reuse := review.verdictReuse(ctx, checkSettings, text, previous.Verdicts)
+	checks := checkHypotheses(ctx, logger, agent, limit, checkSettings, text, snapshot.Hypotheses, reuse)
+	// A failed hunt group leaves the cache as it was, so the next run walks that group over the same delta again.
+	if generatorErr != nil {
+		return checks, usage, generatorErr
+	}
+	snapshot.Verdicts = reuse.verdictsToCache(checks)
+	err = cache.save(ctx, stamp, snapshot)
+	if err != nil {
+		logger.Warn("hypothesis cache write failed", "error", err)
+	}
+	return checks, usage, nil
+}
+
+// hypotheses returns the snapshot of the questions to check: the cached one when the review inputs
+// are unchanged, else the cached questions merged with the ones the generator forks write now.
+func (review hypothesisReview) hypotheses(
+	ctx context.Context,
+	logger *slog.Logger,
+	agent ReviewForkAgent,
+	limit chan struct{},
+	settings ForkSettings,
+	text prompts.Set,
+	previous hypothesisSnapshot,
+) (hypothesisSnapshot, fantasy.Usage, error) {
+	template := hypothesisGeneratorPrompt(text, prompts.HypothesisGeneratorInput{Hunts: allHypothesisHunts()})
+	review.contextDigest = review.settingsDigest(template, settings)
 	patchDigest := digest.SHA256Hex(review.diff.Patch)
 	if previous.Head == review.diff.Head && previous.MergeBase == review.diff.MergeBase &&
-		previous.ContextDigest == review.contextDigest && previous.PatchDigest == patchDigest && review.keepsNotes(previous) {
+		previous.ContextDigest == review.contextDigest && previous.PatchDigest == patchDigest && keepsNotes(review.config.RunContext, previous.Notes) {
 		logger.Info("hypothesis cache reused unchanged diff", "hypotheses", len(previous.Hypotheses))
-		return previous.Hypotheses, fantasy.Usage{}, nil
+		return previous, fantasy.Usage{}, nil
 	}
 
 	input := prompts.HypothesisGeneratorInput{
@@ -57,20 +83,57 @@ func (review hypothesisReview) hypotheses(
 	}
 	generated, usage, err := generateHypothesesByHuntGroup(ctx, agent, limit, settings, text, input)
 	logger.Info("review hypothesis generator done", "hypotheses", len(generated), "usage", usage.String())
-	hypotheses := mergeHypotheses(previous.Hypotheses, generated, review.diff.Head)
-	// A failed hunt group leaves the cache as it was, so the next run walks that group over the same delta again.
-	if err != nil {
-		return hypotheses, usage, err
-	}
-	err = cache.save(ctx, stamp, hypothesisSnapshot{
+	return hypothesisSnapshot{
 		Head: review.diff.Head, MergeBase: review.diff.MergeBase, PatchDigest: patchDigest,
 		ContextDigest: review.contextDigest, Worktree: review.config.IncludeWorktree, Notes: review.config.RunContext,
-		Hypotheses: hypotheses,
-	})
-	if err != nil {
-		logger.Warn("hypothesis cache write failed", "error", err)
+		Hypotheses: mergeHypotheses(previous.Hypotheses, generated, review.diff.Head),
+	}, usage, err
+}
+
+// checkHypotheses gives each hypothesis its cached verdict when that verdict still holds, and checks the others.
+func checkHypotheses(
+	ctx context.Context, logger *slog.Logger, agent ReviewForkAgent, limit chan struct{}, settings ForkSettings,
+	text prompts.Set, hypotheses []Hypothesis, reuse verdictReuse,
+) []HypothesisCheck {
+	if len(hypotheses) == 0 {
+		return nil
 	}
-	return hypotheses, usage, nil
+	checks, open, openIndexes := reuse.splitByReuse(hypotheses)
+	logger.Info("review hypothesis verdicts reused", "reused", len(hypotheses)-len(open), "to_check", len(open))
+	fresh := checkAndRecheck(ctx, logger, agent, limit, settings, text, open)
+	return mergeCheckedHypotheses(checks, fresh, openIndexes)
+}
+
+// mergeCheckedHypotheses puts each fresh check at its index among the reused checks, in the order of the hypotheses.
+func mergeCheckedHypotheses(reused []HypothesisCheck, fresh []HypothesisCheck, freshIndexes []int) []HypothesisCheck {
+	merged := slices.Clone(reused)
+	for position, check := range fresh {
+		merged[freshIndexes[position]] = check
+	}
+	return merged
+}
+
+// checkAndRecheck checks the hypotheses in ledger batches, then gives each UNSURE answer its own recheck fork.
+func checkAndRecheck(
+	ctx context.Context, logger *slog.Logger, agent ReviewForkAgent, limit chan struct{}, settings ForkSettings,
+	text prompts.Set, hypotheses []Hypothesis,
+) []HypothesisCheck {
+	checks := checkHypothesisBatches(ctx, agent, limit, settings, hypotheses, text)
+	logger.Info("review hypothesis ledger done", "hypotheses", len(checks))
+	var recheck sync.WaitGroup
+	for index := range checks {
+		if checks[index].Verdict != HypothesisVerdictUnsure {
+			continue
+		}
+		recheck.Go(func() {
+			limit <- struct{}{}
+			defer func() { <-limit }()
+			checks[index] = RecheckUndecidedHypothesis(ctx, agent, settings, checks[index], text)
+			logger.Info("review hypothesis recheck done", "hypothesis", checks[index].ID, "verdict", checks[index].Verdict)
+		})
+	}
+	recheck.Wait()
+	return checks
 }
 
 func checkHypothesisBatches(
@@ -94,7 +157,7 @@ func checkHypothesisBatches(
 func (review hypothesisReview) delta(ctx context.Context, previous hypothesisSnapshot) string {
 	cfg := review.config
 	if cfg.IncludeWorktree || previous.MergeBase != review.diff.MergeBase || previous.ContextDigest != review.contextDigest ||
-		!review.keepsNotes(previous) {
+		!keepsNotes(cfg.RunContext, previous.Notes) {
 		return ""
 	}
 	pathspec := reviewPathspec(review.ignorePatterns)
@@ -111,14 +174,23 @@ func (review hypothesisReview) delta(ctx context.Context, previous hypothesisSna
 	return delta
 }
 
-// keepsNotes reports whether every --context note the cached questions were written under is still given; a removed note can hide a question it suppressed.
-func (review hypothesisReview) keepsNotes(previous hypothesisSnapshot) bool {
-	for _, note := range previous.Notes {
-		if !slices.Contains(review.config.RunContext, note) {
+// keepsNotes reports whether every --context note that earlier work ran under is in given; a removed
+// note can hide a question it suppressed or a finding it answered.
+func keepsNotes(given []string, notes []string) bool {
+	for _, note := range notes {
+		if !slices.Contains(given, note) {
 			return false
 		}
 	}
 	return true
+}
+
+// settingsDigest keys cached work to the review context, the prompt template, the backend, and the fork settings.
+func (review hypothesisReview) settingsDigest(template string, settings ForkSettings) string {
+	return digest.SHA256Hex(strings.Join([]string{
+		review.contextDigest, template, review.config.GeneratorBackend,
+		settings.Model, settings.ReasoningEffort, strconv.Itoa(settings.MaxSteps),
+	}, "\x00"))
 }
 
 func previousQuestions(hypotheses []Hypothesis) string {
@@ -139,15 +211,12 @@ func mergeHypotheses(previous []Hypothesis, generated []Hypothesis, commit strin
 	merged := append([]Hypothesis(nil), previous...)
 	slugs := make(map[string]bool, len(previous))
 	questions := make(map[string]int, len(previous))
-	questionKey := func(hypothesis Hypothesis) string {
-		return strings.TrimSpace(hypothesis.At) + "\x00" + strings.TrimSpace(hypothesis.Question)
-	}
 	for i, hypothesis := range previous {
 		slugs[hypothesis.Slug] = true
-		questions[questionKey(hypothesis)] = i
+		questions[hypothesisQuestionKey(hypothesis)] = i
 	}
 	for _, hypothesis := range generated {
-		question := questionKey(hypothesis)
+		question := hypothesisQuestionKey(hypothesis)
 		slug := hypothesisSlug(hypothesis.Slug, hypothesis.Question)
 		if i, duplicate := questions[question]; duplicate {
 			merged[i].Hunt = cmp.Or(hypothesis.Hunt, merged[i].Hunt)
@@ -166,6 +235,11 @@ func mergeHypotheses(previous []Hypothesis, generated []Hypothesis, commit strin
 		merged = append(merged, hypothesis)
 	}
 	return merged
+}
+
+// hypothesisQuestionKey is the identity of a question across runs: its location and its text.
+func hypothesisQuestionKey(hypothesis Hypothesis) string {
+	return strings.TrimSpace(hypothesis.At) + "\x00" + strings.TrimSpace(hypothesis.Question)
 }
 
 func hypothesisSlug(slug string, question string) string {

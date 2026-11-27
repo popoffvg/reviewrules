@@ -36,6 +36,8 @@ type hypothesisSnapshot struct {
 	Worktree      bool         `json:"worktree"`
 	Notes         []string     `json:"notes"`
 	Hypotheses    []Hypothesis `json:"hypotheses"`
+	// Verdicts maps the question key of each checked hypothesis to its last verdict.
+	Verdicts map[string]cachedVerdict `json:"verdicts,omitempty"`
 }
 
 func branchHypothesisCache(ctx context.Context, cfg ReviewRunConfig, diff ReviewDiff, ignorePatterns []string) (hypothesisCache, error) {

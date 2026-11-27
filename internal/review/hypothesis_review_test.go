@@ -16,19 +16,8 @@ import (
 )
 
 func TestReviewHypothesesAcrossBranchRuns(t *testing.T) {
-	repo := t.TempDir()
-	runHypothesisGit(t, repo, "init", "-b", "main")
-	runHypothesisGit(t, repo, "config", "user.name", "Review Test")
-	runHypothesisGit(t, repo, "config", "user.email", "review@example.invalid")
-	runHypothesisGit(t, repo, "config", "commit.gpgsign", "false")
-	err := os.Mkdir(filepath.Join(repo, ".reviewrules"), 0o700)
-	if err != nil {
-		t.Fatal(err)
-	}
-	writeHypothesisFile(t, repo, ".reviewrules/config.json", "{}\n")
-	writeHypothesisFile(t, repo, "base.txt", "base\n")
+	repo := initHypothesisRepo(t)
 	firstBranch := "review-branch"
-	runHypothesisGit(t, repo, "switch", "-c", firstBranch)
 	writeHypothesisFile(t, repo, "first.txt", "first-branch-change\n")
 	cfg := ReviewRunConfig{
 		RepoRoot: repo, Base: "main", MaxDiffBytes: 100_000, CorrectnessEnabled: true,
@@ -43,20 +32,21 @@ func TestReviewHypothesesAcrossBranchRuns(t *testing.T) {
 		t.Errorf("first hypothesis commit = %s, want %s", got, firstCommit)
 	}
 	again := runHypothesisReview(t, cfg, "")
-	if len(again.agent.generators) != 0 || len(again.agent.checks) != 1 || again.report.Correctness.GeneratorUsage.InputTokens != 0 {
-		t.Fatal("unchanged review must skip generation and run the old check")
+	if len(again.agent.generators) != 0 || len(again.agent.checks) != 0 || again.report.Correctness.GeneratorUsage.InputTokens != 0 ||
+		len(again.report.Correctness.HypothesisCheck) != 1 {
+		t.Fatal("unchanged review must skip generation and reuse the old verdict")
 	}
 	runHypothesisGit(t, repo, "commit", "--allow-empty", "-m", "Advance branch HEAD")
 	newHead := runHypothesisReview(t, cfg, `{"hypotheses":[]}`)
-	if newHead.report.Commit == firstCommit || len(newHead.agent.generators) != len(hypothesisHuntGroups()) || len(newHead.agent.checks) != 1 {
-		t.Fatal("new HEAD with an unchanged patch must run both generation and the old check")
+	if newHead.report.Commit == firstCommit || len(newHead.agent.generators) != len(hypothesisHuntGroups()) || len(newHead.agent.checks) != 0 {
+		t.Fatal("new HEAD with an unchanged patch must run generation and reuse the old verdict")
 	}
 	cfg.HypothesisModelName = "other-generator"
 	newModel := runHypothesisReview(t, cfg, `{"hypotheses":[]}`)
-	if len(newModel.agent.generators) != len(hypothesisHuntGroups()) || len(newModel.agent.checks) != 1 {
-		t.Fatal("changed generator model must run generation and the old check")
+	if len(newModel.agent.generators) != len(hypothesisHuntGroups()) || len(newModel.agent.checks) != 0 {
+		t.Fatal("changed generator model must run generation and reuse the old verdict")
 	}
-	err = os.WriteFile(filepath.Join(repo, ".reviewrules", "config.json"), []byte(`{"instructions":"Check empty values."}`), 0o600)
+	err := os.WriteFile(filepath.Join(repo, ".reviewrules", "config.json"), []byte(`{"instructions":"Check empty values."}`), 0o600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,15 +56,15 @@ func TestReviewHypothesesAcrossBranchRuns(t *testing.T) {
 	}
 	cfg.RunContext = []string{"first.txt:1: the change is by design"}
 	newNote := runHypothesisReview(t, cfg, "")
-	if len(newNote.agent.generators) != 0 || len(newNote.agent.checks) != 1 {
-		t.Fatal("a new --context note must reuse the questions and run the old check")
+	if len(newNote.agent.generators) != 0 || len(newNote.agent.checks) != 0 {
+		t.Fatal("a new --context note must reuse the questions and the REFUTED verdict")
 	}
 	runHypothesisGit(t, repo, "commit", "--allow-empty", "-m", "Write questions under a note")
 	runHypothesisReview(t, cfg, `{"hypotheses":[]}`)
 	cfg.RunContext = nil
 	droppedNote := runHypothesisReview(t, cfg, `{"hypotheses":[]}`)
-	if len(droppedNote.agent.generators) != len(hypothesisHuntGroups()) || len(droppedNote.agent.checks) != 1 {
-		t.Fatal("a removed --context note must regenerate the questions and run the old check")
+	if len(droppedNote.agent.generators) != len(hypothesisHuntGroups()) || len(droppedNote.agent.checks) != 0 {
+		t.Fatal("a removed --context note must regenerate the questions and keep a verdict judged without it")
 	}
 
 	writeHypothesisFile(t, repo, "second.txt", "second-branch-change\n")
@@ -148,6 +138,7 @@ func TestReviewHypothesesAcrossBranchRuns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	cfg.HypothesisCheckModelName = "batch-checker"
 	batched := runHypothesisReview(t, cfg, string(reply))
 	if len(batched.agent.checks) != 2 || len(batched.report.Correctness.HypothesisCheck) != maxHypotheses+2 {
 		t.Fatal("checker must verify the full ledger in batches")
@@ -183,7 +174,11 @@ func TestMergeHypothesesKeepsCaseSensitiveQuestions(t *testing.T) {
 
 func runHypothesisReview(t *testing.T, cfg ReviewRunConfig, generatorReply string) hypothesisRun {
 	t.Helper()
-	agent := &hypothesisTestAgent{reply: generatorReply}
+	return runReviewWithAgent(t, cfg, &hypothesisTestAgent{reply: generatorReply})
+}
+
+func runReviewWithAgent(t *testing.T, cfg ReviewRunConfig, agent *hypothesisTestAgent) hypothesisRun {
+	t.Helper()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	report, err := RunReview(t.Context(), logger, func(string) ReviewForkAgent { return agent }, cfg)
 	if err != nil {
@@ -193,6 +188,24 @@ func runHypothesisReview(t *testing.T, cfg ReviewRunConfig, generatorReply strin
 		t.Fatal(report.Correctness.GeneratorError)
 	}
 	return hypothesisRun{report: report, agent: agent}
+}
+
+// initHypothesisRepo makes a repo with a commit on main and checks out the branch review-branch.
+func initHypothesisRepo(t *testing.T) string {
+	t.Helper()
+	repo := t.TempDir()
+	runHypothesisGit(t, repo, "init", "-b", "main")
+	runHypothesisGit(t, repo, "config", "user.name", "Review Test")
+	runHypothesisGit(t, repo, "config", "user.email", "review@example.invalid")
+	runHypothesisGit(t, repo, "config", "commit.gpgsign", "false")
+	err := os.Mkdir(filepath.Join(repo, ".reviewrules"), 0o700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeHypothesisFile(t, repo, ".reviewrules/config.json", "{}\n")
+	writeHypothesisFile(t, repo, "base.txt", "base\n")
+	runHypothesisGit(t, repo, "switch", "-c", "review-branch")
+	return repo
 }
 
 func runHypothesisGit(t *testing.T, repo string, args ...string) {
@@ -213,11 +226,24 @@ func writeHypothesisFile(t *testing.T, repo string, file string, content string)
 	runHypothesisGit(t, repo, "commit", "-m", "Add "+file)
 }
 
+// hypothesisTestAgent answers every generator fork with reply, and each hypothesis with its slug's row
+// in verdicts, or REFUTED when the slug has no row.
 type hypothesisTestAgent struct {
 	lock       sync.Mutex
 	reply      string
+	verdicts   map[string]hypothesisCheckReply
 	generators []string
 	checks     []string
+	checked    []string
+}
+
+// checkedSlugs is the set of hypothesis slugs that a checker fork received.
+func (agent *hypothesisTestAgent) checkedSlugs() map[string]bool {
+	slugs := map[string]bool{}
+	for _, slug := range agent.checked {
+		slugs[slug] = true
+	}
+	return slugs
 }
 
 func (*hypothesisTestAgent) StartParentSession(context.Context, string, ForkSettings) (fantasy.Usage, error) {
@@ -242,9 +268,12 @@ func (agent *hypothesisTestAgent) ForkHypothesisLedger(_ context.Context, prompt
 	agent.checks = append(agent.checks, prompt)
 	reply := hypothesisLedgerReply{}
 	for _, hypothesis := range hypotheses {
-		reply.Verdicts = append(reply.Verdicts, hypothesisLedgerVerdict{
-			ID: hypothesis.ID, hypothesisCheckReply: hypothesisCheckReply{Verdict: HypothesisVerdictRefuted},
-		})
+		agent.checked = append(agent.checked, hypothesis.Slug)
+		answer, found := agent.verdicts[hypothesis.Slug]
+		if !found {
+			answer = hypothesisCheckReply{Verdict: HypothesisVerdictRefuted}
+		}
+		reply.Verdicts = append(reply.Verdicts, hypothesisLedgerVerdict{ID: hypothesis.ID, hypothesisCheckReply: answer})
 	}
 	data, err := json.Marshal(reply)
 	return ForkReply{Text: hypothesisJSON(string(data))}, err
