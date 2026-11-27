@@ -1,0 +1,3 @@
+kind: Added
+body: A run keeps the verdict of a correctness question while the files the verdict cites and the --context notes stay the same, so a verdict no longer flips between runs; the summary marks it `reused from <commit>` and the JSON report sets `reused_from`. A new note checks CONFIRMED and UNSURE verdicts again, and a --worktree run checks every question.
+time: 2026-11-27T12:00:00.000000+01:00

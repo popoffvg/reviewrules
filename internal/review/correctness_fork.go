@@ -40,6 +40,8 @@ type HypothesisCheck struct {
 	Edit        string            `json:"edit,omitempty"`
 	Error       string            `json:"error,omitempty"`
 	Usage       fantasy.Usage     `json:"usage"`
+	// ReusedFrom is the commit of the earlier run that judged this verdict; empty when this run judged it.
+	ReusedFrom string `json:"reused_from,omitempty"`
 }
 
 type hypothesisListReply struct {

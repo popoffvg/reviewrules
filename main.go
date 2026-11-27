@@ -389,6 +389,9 @@ func printReviewSummary(target *os.File, report review.ReviewReport) {
 	}
 	for _, check := range report.Correctness.HypothesisCheck {
 		fmt.Fprintf(&out, "%-9s %s %s — %s\n", check.Verdict, check.ID, check.At, check.Question)
+		if check.ReusedFrom != "" {
+			fmt.Fprintf(&out, "          reused from %s: judged in an earlier run, and the files it cites are unchanged\n", shortCommitID(check.ReusedFrom))
+		}
 		if check.Verdict == review.HypothesisVerdictConfirmed {
 			fmt.Fprintf(&out, "          priority: %s\n", check.BugPriority)
 			fmt.Fprintf(&out, "          input that breaks it: %s\n", check.Scenario)
@@ -416,4 +419,10 @@ func printReviewSummary(target *os.File, report review.ReviewReport) {
 		fmt.Fprintf(&out, "cost estimate: %s has no price; add a prices.%q table to the user config\n", model, model)
 	}
 	_, _ = fmt.Fprint(target, out.String())
+}
+
+// shortCommitID cuts a commit id to the 12 characters a summary line shows.
+func shortCommitID(commit string) string {
+	const shownLength = 12
+	return commit[:min(len(commit), shownLength)]
 }

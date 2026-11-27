@@ -171,32 +171,12 @@ func RunReview(
 	report.Correctness.Enabled = cfg.CorrectnessEnabled
 	if cfg.CorrectnessEnabled {
 		wait.Go(func() {
-			hypotheses, usage, err := review.hypotheses(ctx, logger, agent, limit, generatorSettings, text)
+			checks, usage, err := review.checkedHypotheses(ctx, logger, agent, limit, generatorSettings, checkSettings, text)
 			lock.Lock()
 			report.Correctness.GeneratorUsage = usage
 			if err != nil {
 				report.Correctness.GeneratorError = err.Error()
 			}
-			lock.Unlock()
-			var checks []HypothesisCheck
-			if len(hypotheses) > 0 {
-				checks = checkHypothesisBatches(ctx, agent, limit, checkSettings, hypotheses, text)
-				logger.Info("review hypothesis ledger done", "hypotheses", len(checks))
-				var recheck sync.WaitGroup
-				for index := range checks {
-					if checks[index].Verdict != HypothesisVerdictUnsure {
-						continue
-					}
-					recheck.Go(func() {
-						limit <- struct{}{}
-						defer func() { <-limit }()
-						checks[index] = RecheckUndecidedHypothesis(ctx, agent, checkSettings, checks[index], text)
-						logger.Info("review hypothesis recheck done", "hypothesis", checks[index].ID, "verdict", checks[index].Verdict)
-					})
-				}
-				recheck.Wait()
-			}
-			lock.Lock()
 			report.Correctness.HypothesisCheck = checks
 			lock.Unlock()
 		})

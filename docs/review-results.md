@@ -37,10 +37,10 @@ With `CI=true` and no `--json-out`, the report goes to stdout. Whenever JSON tak
 
 The correctness usage is available as `correctness.generator_usage`, `correctness.check_usage`, and `correctness.usage`. `cost_estimate.per_part_usd.correctness` holds its cost. `cost_estimate.parts` has one row per part and model. `total_usage` and `cost_estimate.total_usd` cover the whole run.
 
-The report's `commit` identifies the current review. Each hypothesis has a `slug` and a `commit` that identifies its original HEAD.
+The report's `commit` identifies the current review. Each hypothesis has a `slug` and a `commit` that identifies its original HEAD. A hypothesis with `reused_from` carries the verdict of the earlier run at that commit, and this run did not judge it again.
 
 ## Correctness check
 
-The correctness check runs by default. Checker forks verify the earlier and new questions in batches against the current diff. Each question that stays `UNSURE` gets a separate check.
+The correctness check runs by default. A question keeps its cached verdict while the files that the verdict cites and the notes stay the same. A `--worktree` run checks every question. Checker forks verify the other questions in batches against the current diff. Each question that stays `UNSURE` gets a separate check.
 
-Choose the generator and checker models separately with `hypothesis_model` and `hypothesis_check_model`. To turn correctness off, set `correctness = false` in `.reviewrules/settings.toml`. See [the hypothesis cache](how-a-run-works.md#hypothesis-cache) for when a run can skip generation.
+Choose the generator and checker models separately with `hypothesis_model` and `hypothesis_check_model`. To turn correctness off, set `correctness = false` in `.reviewrules/settings.toml`. See [the hypothesis cache](how-a-run-works.md#hypothesis-cache) for when a run can skip generation, and [the verdict cache](how-a-run-works.md#verdict-cache) for when a run reuses a verdict.
