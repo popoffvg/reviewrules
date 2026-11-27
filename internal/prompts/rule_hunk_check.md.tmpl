@@ -1,0 +1,21 @@
+# New task: check ONE rule, hunk by hunk
+
+Rule id: {{.ID}}
+Severity: {{.Severity}}
+Rule: {{.Text}}
+
+Check only this rule. Ignore every other problem.
+The diff and the convention docs are already in the conversation. Check only the hunks listed below. Find each one in the diff by its file and its `@@` line, and judge it on its own.
+Report a violation only in lines the hunk adds (lines starting with "+"). Open a file only when the verdict depends on a line the diff does not show.
+
+Hunks to check:
+{{range .Hunks}}- {{.ID}}: {{.File}} {{.Header}}
+{{end}}
+Do not write a plan or the steps. Reply with one json block and nothing else.
+Give one entry per listed hunk, in the listed order, and skip none. Evidence is one line: the added line that breaks the rule, what you compared, or "no added line of this kind".
+A FAIL entry lists every violating added line of its hunk in findings, not the first one: the author fixes only the lines you list.
+
+```json
+{"hunks": [{"hunk": "h1", "status": "PASS or FAIL or N/A", "evidence": "file:line — one line",
+  "findings": [{"file": "path", "line": 0, "message": "what breaks the rule"}]}]}
+```

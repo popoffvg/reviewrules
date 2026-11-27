@@ -21,9 +21,9 @@ func TestHypothesisCacheEvictsBySizeAndUse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var caches []hypothesisCache
+	var caches []branchCache
 	for _, branch := range []string{"first", "second", "third", "large"} {
-		caches = append(caches, hypothesisCache{dir: dir, key: digest.SHA256Hex(branch), maxBytes: 2 * int64(len(data))})
+		caches = append(caches, branchCache{dir: dir, key: digest.SHA256Hex(branch), suffix: hypothesisCacheSuffix, maxBytes: 2 * int64(len(data))})
 	}
 	for i, cache := range caches[:2] {
 		saveHypothesisSnapshot(t, cache, "", snapshot)
@@ -64,7 +64,7 @@ func TestHypothesisCacheEvictsBySizeAndUse(t *testing.T) {
 }
 
 func TestHypothesisCacheRejectsStaleWrite(t *testing.T) {
-	cache := hypothesisCache{dir: t.TempDir(), key: digest.SHA256Hex("branch"), maxBytes: hypothesisCacheBytes}
+	cache := branchCache{dir: t.TempDir(), key: digest.SHA256Hex("branch"), suffix: hypothesisCacheSuffix, maxBytes: hypothesisCacheBytes}
 	first := hypothesisSnapshot{Head: strings.Repeat("a", 40), MergeBase: strings.Repeat("b", 40)}
 	saveHypothesisSnapshot(t, cache, "", first)
 	_, stamp := readHypothesisSnapshot(t, cache)
@@ -77,7 +77,7 @@ func TestHypothesisCacheRejectsStaleWrite(t *testing.T) {
 	}
 }
 
-func readHypothesisSnapshot(t *testing.T, cache hypothesisCache) (hypothesisSnapshot, string) {
+func readHypothesisSnapshot(t *testing.T, cache branchCache) (hypothesisSnapshot, string) {
 	t.Helper()
 	snapshot, stamp, err := cache.load(t.Context())
 	if err != nil {
@@ -86,7 +86,7 @@ func readHypothesisSnapshot(t *testing.T, cache hypothesisCache) (hypothesisSnap
 	return snapshot, stamp
 }
 
-func saveHypothesisSnapshot(t *testing.T, cache hypothesisCache, stamp string, snapshot hypothesisSnapshot) {
+func saveHypothesisSnapshot(t *testing.T, cache branchCache, stamp string, snapshot hypothesisSnapshot) {
 	t.Helper()
 	err := cache.save(t.Context(), stamp, snapshot)
 	if err != nil {

@@ -141,10 +141,16 @@ func (reuse verdictReuse) reusedCheck(hypothesis Hypothesis) (HypothesisCheck, b
 // judged under must still be given. A note added since can answer a CONFIRMED or UNSURE finding, so only a
 // REFUTED verdict outlives it.
 func (reuse verdictReuse) allows(verdict cachedVerdict) bool {
-	if verdict.CheckDigest != reuse.checkDigest || !isGitCommit(verdict.JudgedAt) || !keepsNotes(reuse.notes, verdict.Notes) {
+	if verdict.CheckDigest != reuse.checkDigest || !isGitCommit(verdict.JudgedAt) {
 		return false
 	}
-	return verdict.Verdict == HypothesisVerdictRefuted || keepsNotes(verdict.Notes, reuse.notes)
+	return notesKeepVerdict(reuse.notes, verdict.Notes, verdict.Verdict == HypothesisVerdictRefuted)
+}
+
+// notesKeepVerdict reports whether a verdict judged under the judged notes stands under the given notes. Every
+// judged note must still be given. A note added since can answer a finding, so only a cleared verdict outlives it.
+func notesKeepVerdict(given []string, judged []string, cleared bool) bool {
+	return keepsNotes(given, judged) && (cleared || keepsNotes(judged, given))
 }
 
 // citesChangedFile reports whether At or an evidence line holds the base name of a changed file followed by `:`.

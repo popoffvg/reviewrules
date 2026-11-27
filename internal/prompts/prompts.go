@@ -18,19 +18,20 @@ var promptFiles embed.FS
 // ReviewSystem is the system prompt of every agent and every call; any change to it per fork breaks cache reuse.
 // It names no tool: every agent sends this same text, and each backend has its own read and
 // search tools (read_file/grep/list_dir, Read/Grep/Glob, or a read-only shell).
-var ReviewSystem = promptText("review_system.md")
+var ReviewSystem = promptText(FileReviewSystem)
 
 // JSONOnlyRetry asks a fork again for the JSON block its last reply did not have.
-var JSONOnlyRetry = promptText("json_only_retry.md")
+var JSONOnlyRetry = promptText(FileJSONOnlyRetry)
 
 // LastStepAnswer makes a fork answer on its last step instead of reading more.
-var LastStepAnswer = promptText("last_step_answer.md")
+var LastStepAnswer = promptText(FileLastStepAnswer)
 
 var (
-	hypothesisGeneratorTemplate = promptTemplate("hypothesis_generator.md.tmpl")
-	parentSessionTemplate       = promptTemplate("parent_session.md.tmpl")
-	ruleCheckTemplate           = promptTemplate("rule_check.md.tmpl")
-	hypothesisCheckTemplate     = promptTemplate("hypothesis_check.md.tmpl")
+	hypothesisGeneratorTemplate = promptTemplate(FileHypothesisGenerator)
+	parentSessionTemplate       = promptTemplate(FileParentSession)
+	ruleCheckTemplate           = promptTemplate(FileRuleCheck)
+	ruleHunkCheckTemplate       = promptTemplate(FileRuleHunkCheck)
+	hypothesisCheckTemplate     = promptTemplate(FileHypothesisCheck)
 )
 
 // ConventionDoc is one convention doc the parent prompt quotes in full.
@@ -64,6 +65,19 @@ type RuleCheckInput struct {
 	ID       string
 	Severity string
 	Text     string
+}
+
+// RuleHunkCheckInput is the one rule a fork checks and the hunks it checks it on.
+type RuleHunkCheckInput struct {
+	RuleCheckInput
+	Hunks []RuleHunk
+}
+
+// RuleHunk names one hunk of the diff: the id the reply quotes, the file, and the `@@` line.
+type RuleHunk struct {
+	ID     string
+	File   string
+	Header string
 }
 
 // HypothesisGeneratorInput scopes new questions to the branch delta when available.
@@ -103,6 +117,7 @@ type Set struct {
 	generator      *template.Template
 	parent         *template.Template
 	rule           *template.Template
+	ruleHunk       *template.Template
 	hypothesis     *template.Template
 }
 
@@ -118,6 +133,7 @@ var defaultSet = Set{
 	generator:      hypothesisGeneratorTemplate,
 	parent:         parentSessionTemplate,
 	rule:           ruleCheckTemplate,
+	ruleHunk:       ruleHunkCheckTemplate,
 	hypothesis:     hypothesisCheckTemplate,
 }
 
@@ -129,6 +145,7 @@ const (
 	FileLastStepAnswer      = "last_step_answer.md"
 	FileParentSession       = "parent_session.md.tmpl"
 	FileRuleCheck           = "rule_check.md.tmpl"
+	FileRuleHunkCheck       = "rule_hunk_check.md.tmpl"
 	FileHypothesisCheck     = "hypothesis_check.md.tmpl"
 )
 
@@ -176,6 +193,8 @@ func Load(dir string) (Set, error) {
 			set.parent, err = parsePromptTemplate(name, text)
 		case FileRuleCheck:
 			set.rule, err = parsePromptTemplate(name, text)
+		case FileRuleHunkCheck:
+			set.ruleHunk, err = parsePromptTemplate(name, text)
 		case FileHypothesisCheck:
 			set.hypothesis, err = parsePromptTemplate(name, text)
 		default:
@@ -206,6 +225,11 @@ func RuleCheck(input RuleCheckInput) string {
 // RuleCheck renders this set's rule prompt.
 func (s Set) RuleCheck(input RuleCheckInput) string {
 	return render(s.rule, input)
+}
+
+// RuleHunkCheck renders this set's prompt that checks one light rule on the listed hunks.
+func (s Set) RuleHunkCheck(input RuleHunkCheckInput) string {
+	return render(s.ruleHunk, input)
 }
 
 // HypothesisGenerator asks a fork to write at most input.MaxHypotheses correctness hypotheses, not to answer them.

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 
 	"github.com/popoffvg/reviewrules/internal/digest"
@@ -139,11 +140,16 @@ func RunReview(
 		Base:                diff.Base,
 	}
 	review := hypothesisReview{config: cfg, diff: diff, ignorePatterns: catalog.IgnorePatterns}
-	if cfg.CorrectnessEnabled {
-		// A new --context note keeps the cached questions; keepsNotes regenerates them when a note they were written under is gone.
-		cacheParent := parent
-		cacheParent.RunContext = nil
-		review.contextDigest = digest.SHA256Hex(text.ReviewSystem + "\x00" + text.ParentSession(cacheParent))
+	// A new --context note keeps the cached work; keepsNotes redoes the work done under a note that is gone.
+	cacheParent := parent
+	cacheParent.RunContext = nil
+	review.contextDigest = digest.SHA256Hex(text.ReviewSystem + "\x00" + text.ParentSession(cacheParent))
+	hasLightRule := slices.ContainsFunc(rules, func(rule rulecatalog.ReviewRule) bool {
+		return rule.Profile == rulecatalog.ThinkingProfileLight
+	})
+	var hunkReview ruleHunkReview
+	if hasLightRule {
+		hunkReview = loadRuleHunkReview(ctx, logger, review, text)
 	}
 	parent.ChangedFiles = diff.ChangedFiles
 	parent.Patch = diff.Patch
@@ -158,11 +164,20 @@ func RunReview(
 	var wait sync.WaitGroup
 	var lock sync.Mutex
 	report.Rules = make([]RuleCheckResult, len(rules))
+	hunkVerdicts := make([]map[string]cachedHunkVerdict, len(rules))
 	for index, rule := range rules {
 		wait.Go(func() {
-			limit <- struct{}{}
-			defer func() { <-limit }()
-			check := CheckRuleInFork(ctx, agent, ruleSettings.withProfile(cfg.RuleProfiles[rule.Profile]), rule, text)
+			settings := ruleSettings.withProfile(cfg.RuleProfiles[rule.Profile])
+			// A light rule runs on a model with no reasoning budget: one verdict over the whole diff names only the first hit.
+			// Its hunk forks take their own slots of limit.
+			var check RuleCheckResult
+			if rule.Profile == rulecatalog.ThinkingProfileLight {
+				check, hunkVerdicts[index] = hunkReview.check(ctx, agent, limit, settings, rule)
+			} else {
+				limit <- struct{}{}
+				check = CheckRuleInFork(ctx, agent, settings, rule, text)
+				<-limit
+			}
 			logger.Info("review rule fork done", "rule", rule.ID, "profile", rule.Profile, "model", check.Model, "verdict", check.Verdict, "usage", check.Usage.String())
 			report.Rules[index] = check
 		})
@@ -182,6 +197,9 @@ func RunReview(
 		})
 	}
 	wait.Wait()
+	if hasLightRule {
+		hunkReview.save(ctx, hunkVerdicts)
+	}
 
 	for _, rule := range report.Rules {
 		report.RulesUsage = AddUsage(report.RulesUsage, rule.Usage)
