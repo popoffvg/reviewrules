@@ -27,8 +27,8 @@ type verdictReuse struct {
 	checkDigest string
 	head        string
 	notes       []string
-	// readsWorktree is set under --worktree: the checkers read files that no commit holds, so the run
-	// reuses no verdict and keeps the cached ones as they are.
+	// readsWorktree is set under --worktree, or when a tracked file has an uncommitted edit: the checkers read
+	// files that no commit holds, so the run reuses no verdict and keeps the cached ones as they are.
 	readsWorktree bool
 	// changedSince maps a judged commit to the files that differ from it at head; a commit git cannot diff is absent,
 	// and under --worktree every commit is absent.
@@ -43,13 +43,20 @@ func (review hypothesisReview) verdictReuse(
 		checkDigest:   review.settingsDigest(text.HypothesisCheck(prompts.HypothesisCheckInput{}), settings),
 		head:          review.diff.Head,
 		notes:         review.config.RunContext,
-		readsWorktree: review.config.IncludeWorktree,
+		readsWorktree: review.config.IncludeWorktree || hasUncommittedEdits(ctx, review.config.RepoRoot),
 	}
 	if reuse.readsWorktree {
 		return reuse
 	}
 	reuse.changedSince = review.changedFilesByJudgedCommit(ctx, reuse.judgedCommits())
 	return reuse
+}
+
+// hasUncommittedEdits reports whether a tracked file differs from HEAD. A failed git call counts as an edit,
+// so a verdict is never stored under a commit it may not describe.
+func hasUncommittedEdits(ctx context.Context, repoRoot string) bool {
+	status, err := runGit(ctx, repoRoot, "--no-optional-locks", "status", "--porcelain", "--untracked-files=no")
+	return err != nil || strings.TrimSpace(status) != ""
 }
 
 // judgedCommits lists the judged commit of each cached verdict that the check digest and the notes still allow,
@@ -184,6 +191,9 @@ func (reuse verdictReuse) verdictsToCache(checks []HypothesisCheck) map[string]c
 // changedFiles lists the files that differ between two commits. A rename lists both paths, so evidence that
 // cites the old path sees the change.
 func changedFiles(ctx context.Context, repoRoot string, from string, to string) ([]string, error) {
+	if from == to {
+		return nil, nil
+	}
 	output, err := runGit(ctx, repoRoot, "--no-optional-locks", "diff", "--name-only", "-z", "--no-renames", from, to, "--")
 	if err != nil {
 		return nil, err

@@ -33,7 +33,7 @@ The cache also keeps the last verdict of each question, with the HEAD commit of 
 
 A run checks the question again when it cannot tell: the judged commit is gone, or git fails. A check that ends in an error is not cached.
 
-A `--worktree` run checks every question and stores no verdict, because its checkers read files that no commit holds. It keeps the verdicts already in the cache for the next run without `--worktree`.
+A `--worktree` run, and a run while a tracked file has an uncommitted edit, checks every question and stores no verdict, because its checkers read files that no commit holds. It keeps the verdicts already in the cache for the next run on a clean tree.
 
 The summary marks a reused verdict with `reused from <commit>`, and the JSON report sets `reused_from`. A reused verdict has no usage.
 

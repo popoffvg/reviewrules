@@ -41,13 +41,17 @@ func (review hypothesisReview) checkedHypotheses(
 	if err != nil {
 		logger.Warn("hypothesis cache read failed", "error", err)
 	}
+	reuseReady := make(chan verdictReuse, 1)
+	go func() { reuseReady <- review.verdictReuse(ctx, checkSettings, text, previous.Verdicts) }()
 	snapshot, usage, generatorErr := review.hypotheses(ctx, logger, agent, limit, generatorSettings, text, previous)
-	reuse := review.verdictReuse(ctx, checkSettings, text, previous.Verdicts)
+	reuse := <-reuseReady
 	checks := checkHypotheses(ctx, logger, agent, limit, checkSettings, text, snapshot.Hypotheses, reuse)
 	// A failed hunt group leaves the cache as it was, so the next run walks that group over the same delta again.
 	if generatorErr != nil {
 		return checks, usage, generatorErr
 	}
+	// An edit made while the checkers ran can be in their verdicts too.
+	reuse.readsWorktree = reuse.readsWorktree || hasUncommittedEdits(ctx, review.config.RepoRoot)
 	snapshot.Verdicts = reuse.verdictsToCache(checks)
 	err = cache.save(ctx, stamp, snapshot)
 	if err != nil {

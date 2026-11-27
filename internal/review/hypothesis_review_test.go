@@ -46,10 +46,7 @@ func TestReviewHypothesesAcrossBranchRuns(t *testing.T) {
 	if len(newModel.agent.generators) != len(hypothesisHuntGroups()) || len(newModel.agent.checks) != 0 {
 		t.Fatal("changed generator model must run generation and reuse the old verdict")
 	}
-	err := os.WriteFile(filepath.Join(repo, ".reviewrules", "config.json"), []byte(`{"instructions":"Check empty values."}`), 0o600)
-	if err != nil {
-		t.Fatal(err)
-	}
+	writeHypothesisFile(t, repo, ".reviewrules/config.json", `{"instructions":"Check empty values."}`)
 	newContext := runHypothesisReview(t, cfg, `{"hypotheses":[]}`)
 	if len(newContext.agent.generators) != len(hypothesisHuntGroups()) || len(newContext.agent.checks) != 1 {
 		t.Fatal("changed instructions must regenerate and run the old check")
@@ -97,7 +94,7 @@ func TestReviewHypothesesAcrossBranchRuns(t *testing.T) {
 	}
 	runHypothesisGit(t, repo, "switch", firstBranch)
 	cfg.IncludeWorktree = true
-	err = os.WriteFile(filepath.Join(repo, "second.txt"), []byte("dirty-change\n"), 0o600)
+	err := os.WriteFile(filepath.Join(repo, "second.txt"), []byte("dirty-change\n"), 0o600)
 	if err != nil {
 		t.Fatal(err)
 	}

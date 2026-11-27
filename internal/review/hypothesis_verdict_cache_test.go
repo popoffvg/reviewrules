@@ -100,6 +100,19 @@ func TestReviewReusesVerdictsWhileTheirInputsHold(t *testing.T) {
 			wantChecked: everyQuestion,
 		},
 		{
+			name:        "an uncommitted edit: every question is checked",
+			change:      func(t *testing.T, repo string, _ *ReviewRunConfig) { editWithoutCommit(t, repo, "d.txt") },
+			wantChecked: everyQuestion,
+		},
+		{
+			name:    "an uncommitted edit: no verdict is stored",
+			prepare: func(t *testing.T, repo string, _ *ReviewRunConfig) { editWithoutCommit(t, repo, "d.txt") },
+			change: func(t *testing.T, repo string, _ *ReviewRunConfig) {
+				runHypothesisGit(t, repo, "checkout", "--", "d.txt")
+			},
+			wantChecked: everyQuestion,
+		},
+		{
 			name: "an added note reuses only the REFUTED verdict",
 			change: func(_ *testing.T, _ string, cfg *ReviewRunConfig) {
 				cfg.RunContext = []string{"c.txt:1: the error is by design"}
@@ -166,6 +179,14 @@ const verdictQuestions = `{"hypotheses":[` +
 	`{"slug":"confirmed","at":"c.txt:1","question":"Is the error dropped?"},` +
 	`{"slug":"unsure","at":"d.txt:1","question":"Does the caller retry?"},` +
 	`{"slug":"no-at","question":"Does any caller skip the check?"}]}`
+
+func editWithoutCommit(t *testing.T, repo string, file string) {
+	t.Helper()
+	err := os.WriteFile(filepath.Join(repo, file), []byte("uncommitted edit\n"), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
 
 func runVerdictReview(t *testing.T, cfg ReviewRunConfig, verdicts map[string]hypothesisCheckReply) hypothesisRun {
 	t.Helper()
