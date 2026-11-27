@@ -1,3 +1,0 @@
-kind: Changed
-body: A `light` rule now judges each hunk that adds a line, in small batches per fork, and lists every hit, not the first one; a rerun on the same branch reuses the verdict of each unchanged hunk and asks only about the hunks that changed. A `prompts_dir` can replace the new `rule_hunk_check.md.tmpl`.
-time: 2026-11-27T14:00:00.000000+01:00
